@@ -10,7 +10,7 @@ def project_scvi(adata_file, batch_col, query_name, dim=10):
     query = adata[mask_query].copy()
     ref = adata[~mask_query].copy()
     
-    scvi.data.setup_anndata(ref, batch_key="study")
+    scvi.data.setup_anndata(ref, batch_key=batch_col)
 
     vae = scvi.model.SCVI(
         adata,
