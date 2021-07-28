@@ -1,0 +1,20 @@
+# Submit intergation metrics running to slurm
+
+# Eval Karin:
+sbatch_script=$WSC/qtr_intercode_reproducibility-/scripts/integration_benchmarks/run_metrics.sbatch
+eval_script="$WSC"/qtr_intercode_reproducibility-/scripts/integration_benchmarks/run_metrics.py
+data_path=/storage/groups/ml01/workspace/karin.hrovatin/data/pancreas/scRNA/qtr/
+batch=study_sample
+cell_type=cell_type
+
+unset FILES
+declare -a FILES     
+
+FILES[1]='data_integrated_try.h5ad;X_integrated'
+
+for i in "${!FILES[@]}"
+do
+  IFS=";" read -r file obsm  <<< "${FILES[$i]}"
+  echo i $i file $file obsm $obsm
+  sbatch $sbatch_script $eval_script "$data_path""$file" $obsm $batch $cell_type 
+done
