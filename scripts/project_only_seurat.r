@@ -1,10 +1,9 @@
 library(Seurat)
 library(anndata)
 
-# For multiple queries integrates these queries and then projects the integrated query object
-# to the reference.
+# For multiple queries just projects every query to the reference.
 # .X should have unnormalized counts.
-project_seurat <- function(adata_file, batch_col, query_names, dim=50)
+project_only_seurat <- function(adata_file, batch_col, query_names, dim=50)
 {
 
   ad <- read_h5ad(adata_file)
@@ -34,20 +33,6 @@ project_seurat <- function(adata_file, batch_col, query_names, dim=50)
   ref <- IntegrateData(anchorset = anchors_refs, dims = 1:dim)
   rm(anchors_refs)
 
-  if(length(queries) > 1)
-  {
-    print("Integrating query:")
-    print(names(queries))
-    anchors_qs <- FindIntegrationAnchors(object.list = queries, dims = 1:dim)
-    rm(queries)
-    query <- IntegrateData(anchorset = anchors_qs, dims = 1:dim)
-    rm(anchors_qs)
-  }
-  else
-  {
-    query <- queries[[1]]
-    rm(queries)
-  }
 
   ref <- ScaleData(ref)
   ref <- RunPCA(ref, npcs = dim)
@@ -56,15 +41,24 @@ project_seurat <- function(adata_file, batch_col, query_names, dim=50)
   ref <- FindNeighbors(ref, reduction = "spca", dims = 1:dim, graph.name = "spca.nn",
                        k.param = 50, cache.index = TRUE, return.neighbor = TRUE, l2.norm = TRUE)
 
-  print("Mapping query to reference.")
-  anchors_query <- FindTransferAnchors(reference = ref, query = query, reference.reduction = "spca",
-                                       reference.neighbors = "spca.nn", dims = 1:dim)
+  latent <- Embeddings(ref, reduction = "spca")
 
-  query <- IntegrateEmbeddings(anchorset = anchors_query, reference = ref, query = query, reductions = "pcaproject",
-                               dims = 1:dim, new.reduction.name = "qrmapping", reuse.weights.matrix = FALSE)
-  rm(anchors_query)
+  for (i in 1:length(queries))
+  {
+    query <- queries[i]
+    print("Mapping query to reference:")
+    print(names(query))
+    query <- query[[1]]
+    anchors_query <- FindTransferAnchors(reference = ref, query = query, reference.reduction = "spca",
+                                         reference.neighbors = "spca.nn", dims = 1:dim)
 
-  latent <- rbind(Embeddings(ref, reduction = "spca"), Embeddings(query, reduction = "qrmapping"))
+    query <- IntegrateEmbeddings(anchorset = anchors_query, reference = ref, query = query, reductions = "pcaproject",
+                                 dims = 1:dim, new.reduction.name = "qrmapping", reuse.weights.matrix = FALSE)
+    rm(anchors_query)
+
+    latent <- rbind(latent, Embeddings(query, reduction = "qrmapping"))
+  }
+
   ad$obsm[["X_seurat"]] <- latent[ad$obs_names,]
 
   ad$write_h5ad(adata_file)
