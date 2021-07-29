@@ -1,5 +1,6 @@
 library(Seurat)
 library(anndata)
+library(Matrix)
 
 # For multiple queries just projects every query to the reference.
 # .X should have unnormalized counts.
@@ -7,6 +8,10 @@ project_only_seurat <- function(adata_file, batch_col, query_names, dim=50)
 {
 
   ad <- read_h5ad(adata_file)
+
+  if (is(ad$X, "dgRMatrix")) {
+      ad$X <- as(ad$X, "CsparseMatrix")
+  }
 
   se <- CreateSeuratObject(counts=t(ad$X))
   VariableFeatures(se) <- rownames(se)
