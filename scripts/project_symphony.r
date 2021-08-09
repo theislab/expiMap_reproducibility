@@ -27,7 +27,7 @@ project_symphony <- function(adata_file, batch_col, query_names, dim=20)
       do_umap = FALSE,
       do_normalize = TRUE,
       vargenes_method = 'vst',
-      topn = 2000,
+      topn = ad$n_vars, # use all variables
       d = dim
   )
 
