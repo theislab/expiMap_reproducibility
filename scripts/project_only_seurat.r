@@ -7,6 +7,8 @@ library(Matrix)
 project_only_seurat <- function(adata_file, batch_col, query_names, label_col=NULL, dim=50)
 {
 
+  print("Reading data.")
+
   ad <- read_h5ad(adata_file)
 
   # Sort ad by batch with queries last

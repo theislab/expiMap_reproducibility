@@ -5,6 +5,8 @@ library(anndata)
 project_symphony <- function(adata_file, batch_col, query_names, dim=20)
 {
 
+  print("Reading data.")
+
   ad <- read_h5ad(adata_file)
 
   q_mask <- ad$obs[[batch_col]] %in% query_names
