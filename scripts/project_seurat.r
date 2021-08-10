@@ -7,6 +7,8 @@ library(anndata)
 project_seurat <- function(adata_file, batch_col, query_names, dim=50)
 {
 
+  print("Reading data.")
+  
   ad <- read_h5ad(adata_file)
 
   se <- CreateSeuratObject(counts=t(ad$X))
