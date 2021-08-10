@@ -30,7 +30,7 @@ def project_scvi(adata_file, batch_col, query_names, dim=10):
     print("Projecting query:")
     print(query.obs[batch_col].unique())
 
-    vae_q = sca.models.SCVI.load_query_data(query, vae, freeze_dropout=True)
+    vae_q = scvi.model.SCVI.load_query_data(query, vae, freeze_dropout=True)
 
     vae_q.train(max_epochs=500, early_stopping=True, plan_kwargs=dict(weight_decay=0.0))
 
