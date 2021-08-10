@@ -16,7 +16,7 @@ def project_scvi(adata_file, batch_col, query_names, dim=10):
     scvi.data.setup_anndata(ref, batch_key=batch_col)
 
     vae = scvi.model.SCVI(
-        adata,
+        ref,
         n_layers=2,
         n_latent=dim,
         encode_covariates=True,
