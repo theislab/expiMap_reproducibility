@@ -4,6 +4,8 @@ import scvi
 # .X should have unnormalized counts.
 def project_scvi(adata_file, batch_col, query_names, dim=10):
 
+    print("Reading data.")
+
     adata = sc.read(adata_file)
 
     q_mask = adata.obs[batch_col].isin(query_names)
