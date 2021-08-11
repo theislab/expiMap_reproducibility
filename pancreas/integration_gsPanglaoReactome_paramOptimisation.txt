@@ -1,0 +1,148 @@
+#________________
+# Param searches
+
+# First switch to correct branch
+echo "Switching git branch"
+cd $WSC/scarches
+git stash
+branch=$(git symbolic-ref --short HEAD)
+git checkout sergey
+git branch
+
+# Grid search for params
+for a in 0.1 0.3
+    do
+    for akl in 1 1.5 2 3 5 10 20
+        do
+        for ra in 0 1
+            do
+            for uh in 0 1
+                do
+                for b in study study_sample
+                    do
+                    echo alpha $a alpha_kl $akl remove_ambient $ra use_hvg $uh batch $b
+                    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a $a -k $akl -r $ra -u $uh -b $b -s 0 -p 1 -d hyperparamOpt/ -l 0.001 -h 2048,2048,2048 -e 1 -n 10000 -o 400 -S 0
+                    done
+                done
+            done
+        done
+    done
+    
+    
+# Check what happens if we use different dataset proportions
+for dp in 0.05 0.1 0.3 0.5 0.7 1
+    do
+    for akl in 1 2 5 10 20 30 50 70 100
+        do
+        echo dataset_proportion $dp alpha_kl $akl
+        sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a 0.1 -k $akl -r 0 -u 0 -b study_sample -s 1 -p $dp -d dataSubsets/ -l 0.001 -h 2048,2048,2048 -e 1 -n 10000 -o 400
+        done
+    done
+
+
+# Try different depths
+for hls in "2048,2048,2048" "2048,2048,2048,2048" "2048,2048,2048,2048,2048"
+    do
+    for akl in 1 2 5 10 20
+        do
+        echo hls $hls alpha_kl $akl
+        sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a 0.1 -k $akl -r 0 -u 0 -b study_sample -s 0 -p 1 -d hyperparamOpt/layerSizes/ -l 0.001 -h "$hls" -e 1 -n 10000 -o 400
+        done
+    done
+
+
+# Try different learning rates
+for lr in 0.01 0.001 0.0001 0.00001 0.000001
+    do
+    for akl in 1 2 5 10 20
+        do
+        echo lr $lr alpha_kl $akl
+        sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 0 -b study_sample -s 0 -p 1 -d hyperparamOpt/learningRate/ -l "$lr" -h "2048,2048,2048" -e 1 -n 10000 -o 400
+        done
+    done
+    
+# Try different learning rates based on above results, multiple tries
+for lr in 0.00001 0.000001 0.0000001 0.00000001
+    do
+    for akl in 20 30 50 70 100
+        do
+        echo lr $lr alpha_kl $akl
+        sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 0 -b study_sample -s 0 -p 1 -d hyperparamOpt/learningRate/ -l "$lr" -h "2048,2048,2048" -e 1 -n 10000 -o 400
+        done
+    done
+    
+for lr in 0.0001 0.0005 0.00005
+    do
+    for akl in 20 30 40 50 60
+        do
+        echo lr $lr alpha_kl $akl
+        sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 0 -b study_sample -s 0 -p 1 -d hyperparamOpt/learningRate/ -l "$lr" -h "2048,2048,2048" -e 1 -n 10000 -o 400
+        done
+    done
+    
+for lr in 0.00001
+    do
+    for akl in 40 60
+        do
+        echo lr $lr alpha_kl $akl
+        sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 0 -b study_sample -s 0 -p 1 -d hyperparamOpt/learningRate/ -l "$lr" -h "2048,2048,2048" -e 1 -n 10000 -o 400
+        done
+    done
+
+# Early stopping off
+for akl in 20 30 40 50 60 70 80 90 100
+    do
+    echo alpha_kl $akl
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 0 -b study_sample -s 0 -p 1 -d hyperparamOpt/noEarlyStop/ -l 0.00001 -h "2048,2048,2048" -e 0 -n 10000 -o 400
+    done
+
+# Test different n_hvgs to get different n gene sets
+for akl in 1 2 5 10 20 30 50 70 
+    do
+    echo alpha_kl $akl
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 1 -b study_sample -s 0 -p 1 -d hyperparamOpt/hvg/ -l 0.00001 -h "1024,1024,1024" -e 1 -n 5000 -o 400
+    done   
+for akl in 1 2 5 10 20 30 50 70 
+    do
+    echo alpha_kl $akl
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 1 -b study_sample -s 0 -p 1 -d hyperparamOpt/hvg/ -l 0.00001 -h "512,512,512" -e 1 -n 2000 -o 400
+    done   
+ for akl in 1 2 5 10 20 30 50 70 
+    do
+    echo alpha_kl $akl
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 1 -b study_sample -s 0 -p 1 -d hyperparamOpt/hvg/ -l 0.00001 -h "256,256,256" -e 1 -n 1000 -o 400
+    done  
+    
+# Increase n epochs
+for akl in 30 40 50 60 70 
+    do
+    echo alpha_kl $akl
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 0 -b study_sample -s 0 -p 1 -d hyperparamOpt/nEpochs/ -l 0.00001 -h "2048,2048,2048" -e 1 -n 10000 -o 2000
+    done
+
+# Try different learning rates based on above results, multiple tries with larger n_epochs
+for akl in 1 2 5 10 20 30 50 70 
+    do
+    echo alpha_kl $akl
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 1 -b study_sample -s 0 -p 1 -d hyperparamOpt/hvg/ -l 0.00001 -h "1024,1024,1024" -e 1 -n 5000 -o 2000
+    done   
+for akl in 1 2 5 10 20 30 50 70 
+    do
+    echo alpha_kl $akl
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 1 -b study_sample -s 0 -p 1 -d hyperparamOpt/hvg/ -l 0.00001 -h "512,512,512" -e 1 -n 2000 -o 2000
+    done   
+ for akl in 1 2 5 10 20 30 50 70 
+    do
+    echo alpha_kl $akl
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k "$akl" -r 0 -u 1 -b study_sample -s 0 -p 1 -d hyperparamOpt/hvg/ -l 0.00001 -h "256,256,256" -e 1 -n 1000 -o 2000
+    done  
+    
+# Switch back to old branch
+echo "Switching git branch"
+git checkout $branch
+git branch
+git stash pop
+#________________
+# Final model
+sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch -a "0.1" -k 60 -r 0 -u 0 -b study_sample -s 0 -p 1 -d model/ -l 0.00001 -h "2048,2048,2048" -e 1 -n 10000 -o 2000  -S 1
+    
