@@ -4,6 +4,8 @@ import scvi
 # .X should have unnormalized counts.
 def project_scvi(adata_file, batch_col, query_names, dim=10):
 
+    print("Reading data.")
+
     adata = sc.read(adata_file)
 
     q_mask = adata.obs[batch_col].isin(query_names)
@@ -16,7 +18,7 @@ def project_scvi(adata_file, batch_col, query_names, dim=10):
     scvi.data.setup_anndata(ref, batch_key=batch_col)
 
     vae = scvi.model.SCVI(
-        adata,
+        ref,
         n_layers=2,
         n_latent=dim,
         encode_covariates=True,
@@ -30,7 +32,7 @@ def project_scvi(adata_file, batch_col, query_names, dim=10):
     print("Projecting query:")
     print(query.obs[batch_col].unique())
 
-    vae_q = sca.models.SCVI.load_query_data(query, vae, freeze_dropout=True)
+    vae_q = scvi.model.SCVI.load_query_data(query, vae, freeze_dropout=True)
 
     vae_q.train(max_epochs=500, early_stopping=True, plan_kwargs=dict(weight_decay=0.0))
 
