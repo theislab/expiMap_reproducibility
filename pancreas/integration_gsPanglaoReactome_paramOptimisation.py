@@ -141,6 +141,7 @@ print('N retained genes',adata_r.shape[1])
 # Query data - subset to query study cells and ref genes
 adata_q=adata.raw.to_adata()[adata.obs.study==study_query,adata_r.var_names]
 adata_q.obs['cell_type']=adata[adata_q.obs_names,:].obs.cell_type
+adata_q.uns['terms']=adata_r.uns['terms'].copy()
 print('Query shape:',adata_q.shape)
 
 
@@ -199,9 +200,11 @@ model.train(
 # Mark inactivated terms
 adata_r_sub.uns['terms_is_active'] = \
     (model.model.decoder.L0.expr_L.weight.data.norm(p=2, dim=0)>0).cpu().numpy()
-print('Inactive terms:')
-print([term for i, term in enumerate(adata_r_sub.uns['terms']) 
-       if not adata_r_sub.uns['terms_is_active'][i]])
+print('Inactive terms in ref model:')
+inactive_terms=[term for i, term in enumerate(adata_r_sub.uns['terms']) 
+       if not adata_r_sub.uns['terms_is_active'][i]]
+print('N inactive:',len(inactive_terms))
+print(inactive_terms)
 
 # Add integrated embedding
 adata_r_sub.obsm['X_integrated'] = model.get_latent(
@@ -229,13 +232,14 @@ plot_integrated(adata_r_sub,name='ref_'+args_name)
 
 # Save model
 if args.save:
-    model.save(path_save+'ref_'+args_name+'/')
+    model.save(path_save+'ref_'+args_name+'/',overwrite=True)
     print('Saved ref model in:',path_save+'ref_'+args_name+'/')
 
 # Save integrated embedding
 if args.save:
     pd.DataFrame(adata_r_sub.obsm['X_integrated'],
-                 index=adata_r_sub.obs_names,columns=adata_r_sub.uns['terms']
+                 index=adata_r_sub.obs_names,
+                 columns=np.array(adata_r_sub.uns['terms'])[adata_r_sub.uns['terms_is_active']]
                 ).to_csv(
         path_save+'latent_ref_'+args_name+'.tsv',sep='\t'
         )
@@ -257,9 +261,18 @@ model_q.train(
     seed=0
 )
 
+# Mark inactivated terms
+adata_q_sub.uns['terms_is_active'] = \
+    (model_q.model.decoder.L0.expr_L.weight.data.norm(p=2, dim=0)>0).cpu().numpy()
+print('Inactive terms in ref+query model:')
+inactive_terms=[term for i, term in enumerate(adata_q_sub.uns['terms']) 
+       if not adata_q_sub.uns['terms_is_active'][i]]
+print('N inactive:',len(inactive_terms))
+print('List of inactive terms:', inactive_terms)
+
 # Save model
 if args.save:
-    model.save(path_save+'refquery_'+args_name+'/')
+    model_q.save(path_save+'refquery_'+args_name+'/',overwrite=True)
     print('Saved refquery model in:',path_save+'refquery_'+args_name+'/')
 
 # ### Prediction Q&R with Q model
@@ -275,10 +288,7 @@ adata_training=adata.raw.to_adata()[adata_r_sub.obs_names.to_list()+\
 adata_training.obsm['X_integrated'] = model_q.get_latent(
     remove_sparsity(adata_training).X, 
     adata_training.obs[args.batch], mean=True
-    )[:, adata_r_sub.uns['terms_is_active']]
-# Add term info
-adata_training.uns['terms']=list(np.array(adata_r_sub.uns['terms']
-                                         )[adata_r_sub.uns['terms_is_active']])
+    )[:, adata_q_sub.uns['terms_is_active']]
 
 # Compute neighbours and UMAP
 sc.pp.neighbors(adata_training, use_rep='X_integrated')
@@ -291,7 +301,8 @@ plot_integrated(adata_training,name='refqueryTraining_'+args_name,
 # Save integrated embedding
 if args.save:
     pd.DataFrame(adata_training.obsm['X_integrated'],
-                 index=adata_training.obs_names,columns=adata_training.uns['terms']
+                 index=adata_training.obs_names,
+                 columns=np.array(adata_q_sub.uns['terms'])[adata_q_sub.uns['terms_is_active']]
                 ).to_csv(
         path_save+'latent_refqueryTraining_'+args_name+'.tsv',sep='\t'
         )
@@ -303,10 +314,7 @@ if args.save:
 adata_sub.obsm['X_integrated'] = model_q.get_latent(
     remove_sparsity(adata_sub).X, 
     adata_sub.obs[args.batch], mean=True
-    )[:, adata_r_sub.uns['terms_is_active']]
-# Add term info
-adata_sub.uns['terms']=list(np.array(adata_r_sub.uns['terms']
-                                         )[adata_r_sub.uns['terms_is_active']])
+    )[:, adata_q_sub.uns['terms_is_active']]
 
 # Compute neighbours and UMAP
 sc.pp.neighbors(adata_sub, use_rep='X_integrated')
@@ -318,7 +326,8 @@ plot_integrated(adata_sub,name='refquery_'+args_name,color=['study','cell_type',
 # Save integrated embedding
 if args.save:
     pd.DataFrame(adata_sub.obsm['X_integrated'],
-                 index=adata_sub.obs_names,columns=adata_sub.uns['terms']
+                 index=adata_sub.obs_names,
+                 columns=np.array(adata_q_sub.uns['terms'])[adata_q_sub.uns['terms_is_active']]
                 ).to_csv(
         path_save+'latent_refquery_'+args_name+'.tsv',sep='\t'
         )
