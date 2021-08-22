@@ -15,26 +15,4 @@
 source $HOME/.bashrc
 conda activate qtr
 
-while getopts ":a:k:r:u:b:s:p:d:l:h:e:n:o:S:" flag
-do
-    case "${flag}" in
-        a) a=${OPTARG};;
-        k) akl=${OPTARG};;
-        r) ra=${OPTARG};;
-        u) uh=${OPTARG};;
-        b) b=${OPTARG};;
-        s) sd=${OPTARG};;
-        p) dp=${OPTARG};;
-        d) d=${OPTARG};;
-        l) lr=${OPTARG};;
-        h) hls=${OPTARG};;
-        e) es=${OPTARG};;
-        n) nh=${OPTARG};;
-        o) ne=${OPTARG};;
-        S) sa=${OPTARG};;
-    esac
-done
-
-
-echo Script params alpha $a alpha_kl $akl remove_ambient $ra use_hvg $uh batch $b subset_data $sd data_proportion $dp dir $d learning_rate $lr hidden_layer_sizes $hls early_stopping $es n_hvg $nh n_epochs $ne save $sa
-python  /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.py -a "$a" -akl "$akl" -ra "$ra" -uh "$uh" -b "$b" -sd "$sd" -dp "$dp" -d "$d" -lr "$lr" -hls "$hls" -es $es -nh $nh -ne $ne -s $sa
+python /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.py $1
