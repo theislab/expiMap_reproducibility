@@ -39,6 +39,9 @@ importlib.reload(atu)
 import scripts.annotation_transfer_utils as atu
 
 # %%
+sc._settings.settings._vector_friendly=True
+
+# %%
 path_gmt='/storage/groups/ml01/code/karin.hrovatin//qtr_intercode_reproducibility-/metadata/'
 path_data='/storage/groups/ml01/workspace/karin.hrovatin//data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ_rmNodElimination/'
 subdir='mo/'

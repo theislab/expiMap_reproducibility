@@ -13,7 +13,9 @@ import scanpy as sc
 parser = argparse.ArgumentParser()
 parser.add_argument('-if','--input_file', 
                     help='Absolute path of analysed adata file.' + 
-                    'Should have QC normalised counts in X and integrated embedding in obsm.') 
+                    'Should have QC and normalised log transformed counts in X '+
+                    '(e.g. what you would usually use for downstream analyses)'+
+                    'and integrated embedding in obsm.') 
 parser.add_argument('-ie','--integrated_embedding', 
                     help='Name of integrated embedding slot.')
 parser.add_argument('-b','--batch',
