@@ -15,7 +15,7 @@ from scarches.dataset.trvae.data_handling import remove_sparsity
 
 path_data='/storage/groups/ml01/workspace/karin.hrovatin/data/pancreas/scRNA/qtr/'
 # This was set to ending in querySpikeinDrug/ when we used all studies and different query
-path_save_base=path_data+'integrated/gsCellType_query/querySTZ/'
+path_save_base=path_data+'integrated/gsCellType_query/querySTZ_rmNodElimination/'
 path_gmt='/storage/groups/ml01/code/karin.hrovatin//qtr_intercode_reproducibility-/metadata/'
 
 # +
@@ -33,10 +33,12 @@ def parse_alpha(alpha):
         
 parser.add_argument('-d','--dir',type=str,
                    help='Subdir added to base path for saving')
-parser.add_argument('-a','--alpha', type=parse_alpha,
+parser.add_argument('-a','--alpha', type=parse_alpha,default=None,
                     help='Training alpha') 
 parser.add_argument('-akl','--alpha_kl',  type=float,
                     help='Training alpka_kl')
+parser.add_argument('-aklq','--alpha_kl_query',  type=float,default=None,
+                    help='Training alpka_kl for query integration. By default equal to alpha_kl.')
 parser.add_argument('-ra','--remove_ambient',type=intstr_to_bool,
                    help='Remove ambient or not')
 parser.add_argument('-uh','--use_hvg',type=intstr_to_bool,
@@ -67,13 +69,20 @@ parser.add_argument('-ule','--use_l_encoder',type=intstr_to_bool,default=False,
 parser.add_argument('-mg','--max_genes',type=int,default=None,
                    help='Largest gene set size to use. Default is None (no limit).'+\
                     'Should be int otherwise')
+parser.add_argument('-mig','--min_genes',type=int,default=5,
+                   help='Smallest gene set size to use.' )
+parser.add_argument('-aea','--alpha_epoch_anneal',type=int,default=None,
+                   help='N epochs for alpha annealing. Default is None.'+\
+                    'Should be int otherwise')
+parser.add_argument('-aeaq','--alpha_epoch_anneal_query',type=int,default=None,
+                   help='N epochs for alpha annealing in query. Default is None.'+\
+                    'Should be int otherwise')
+parser.add_argument('-wd','--weight_decay',type=float,default=0.04,
+                   help='Weight decay')
 
 
 # +
 # Just for testing without command line or saving data
-
-# Only for saving data for other integaryion methods
-saving_expression=False
 
 # testing
 if False:
@@ -91,15 +100,6 @@ if False:
         '-ule','1',
         '-mg','200',
     ])
-# Saving
-elif saving_expression:
-    args= parser.parse_args(args=[
-        '-d','model/',
-        '-ra','0',
-        '-uh','0',
-        '-mg','200'
-    ])
-
 # Read command line args
 else:
     print(sys.argv)
@@ -111,6 +111,7 @@ path_save=path_save_base+args.dir
 
 args_name='a_'+str(args.alpha).replace(' ','').replace('[','p').replace(']','').replace(',','r')+\
     '-akl_'+str(args.alpha_kl)+\
+    '-aklq_'+str(args.alpha_kl_query)+\
     '-ra_'+str(int(args.remove_ambient))+\
     '-uh_'+str(int(args.use_hvg))+'-b_'+str(args.batch)+\
     '-sd_'+str(args.subset_data)+'-dp_'+str(args.data_proportion)+\
@@ -121,7 +122,11 @@ args_name='a_'+str(args.alpha).replace(' ','').replace('[','p').replace(']','').
     '-ne_'+str(args.n_epochs)+\
     '-dll_'+str(args.decoder_last_layer)+\
     '-ule_'+str(args.use_l_encoder)+\
-    '-mg_'+str(args.max_genes)
+    '-mg_'+str(args.max_genes)+\
+    '-mig_'+str(args.min_genes)+\
+    '-aea_'+str(args.alpha_epoch_anneal)+\
+    '-aeaq_'+str(args.alpha_epoch_anneal_query)+\
+    '-wd_'+str(args.weight_decay)
 print('Args:',args_name)
 
 # ## Prepare ref and query
@@ -131,7 +136,7 @@ adata=sc.read(path_data+'adata_annotated.h5ad')
 print('Whole shape (non-raw):',adata.shape)
 
 # Omit study from ref and query
-study_omit=None # remove this study 
+study_omit='NOD_elimination'# remove this study 
 if study_omit is not None:
     adata=adata[adata.obs.study!=study_omit,:]
     print('Whole filtered shape (non-raw):',adata.shape)
@@ -179,7 +184,7 @@ print('Ref filtered shape:',adata_r.shape)
 sca.add_annotations(adata_r, 
                     [path_gmt+'PanglaoDB_markers_27_Mar_2020_mouseEID.gmt',
                     path_gmt+'c2.cp.reactome.v4.0_mouseEID.gmt'], 
-                    min_genes=5, max_genes=args.max_genes, clean=False)
+                    min_genes=args.min_genes, max_genes=args.max_genes, clean=False)
 print('N used gene sets:',adata_r.varm['I'].shape[1])
 
 # Subset data to only genes in added gene sets
@@ -215,7 +220,7 @@ print('Ref:',adata_r_sub.shape,'Query:',adata_q_sub.shape,'All:',adata_sub.shape
 
 # Save data for other integration methods
 # Subset only to query and ref, not all cells
-if saving_expression:
+if args.save:
     adata_integration=adata_sub[adata_r_sub.obs_names.to_list()+\
                                 adata_q_sub.obs_names.to_list(),:].copy()
     # Query-ref info
@@ -223,8 +228,8 @@ if saving_expression:
     adata_integration.obs.loc[adata_q_sub.obs_names,'ref_query']='query'
     # Save
     print('Integration data shape:',adata_integration.shape)
-    adata_integration.write(path_save_base+'model/adata_integration_RefQueryTraining.h5ad')
-    print(path_save_base+'model/adata_integration_RefQueryTraining.h5ad')
+    adata_integration.write(path_save+'adata_integration_RefQueryTraining_'+args_name+'.h5ad')
+    print(path_save+'adata_integration_RefQueryTrainingg_'+args_name+'.h5ad')
     del adata_integration
     # Integration data shape: (82077, 6571)
     # /storage/groups/ml01/workspace/karin.hrovatin/data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ_rmNodElimination/model/adata_integration_RefQueryTraining.h5ad
@@ -233,13 +238,13 @@ if saving_expression:
     
     # Save terms info
     pickle.dump(np.array(adata_r.uns['terms']),open(
-        path_save_base+'model/terms.pkl',
+        path_save+'terms_'+args_name+'.pkl',
         'wb'))
 
 # ## Training
 
 # Set alpah and omegas
-if isinstance(args.alpha,float):
+if isinstance(args.alpha,float) or args.alpha is None:
     alpha=args.alpha
     omega=None
 else:
@@ -249,6 +254,10 @@ else:
     omega[is_panglao] = args.alpha[0]
     omega[is_reactome] = args.alpha[1]
     alpha=float(1)
+
+# reset query alpha_kl if unspecified
+if args.alpha_kl_query is None:
+    args.alpha_kl_query=args.alpha_kl
 
 # ### Create TRVAE model and train it on reference dataset
 
@@ -277,10 +286,11 @@ early_stopping_kwargs = {
 model.train(
     lr=args.learning_rate,
     n_epochs=args.n_epochs,
-    alpha_epoch_anneal=None, 
+    alpha_epoch_anneal=args.alpha_epoch_anneal, 
     alpha=alpha, # Higehr more integration
     omega=omega,
     alpha_kl=args.alpha_kl, # Higehr more integration
+    weight_decay=args.weight_decay, 
     early_stopping_kwargs=early_stopping_kwargs,
     use_early_stopping=args.early_stopping, 
     seed=0
@@ -342,11 +352,11 @@ model_q = sca.models.TRVAE.load_query_data(remove_sparsity(adata_q_sub), model)
 model_q.train(
     lr=args.learning_rate,
     n_epochs=args.n_epochs,
-    alpha_epoch_anneal=None,  
-    alpha_kl=args.alpha_kl, 
+    alpha_epoch_anneal=args.alpha_epoch_anneal_query,  
+    alpha_kl=args.alpha_kl_query, 
     early_stopping_kwargs=early_stopping_kwargs,
     use_early_stopping=args.early_stopping, 
-    weight_decay=0,
+    weight_decay=args.weight_decay, 
     seed=0
 )
 
