@@ -176,12 +176,35 @@ for akl in 1 10 40
     do
     for lr in 0.001 0.0001 0.00001
         do
-        params="-d initial_runs/ -a 0.1,0.9 -akl ${akl} -ra 0 -uh 0 -b study_sample -sd 0 -lr ${lr} -ne 2000 -s 0 -ule 1 -mg 200"
+        params="-d initial_runs/ -a 0.1,0.9 -akl ${akl} -ra 0 -uh 0 -b study_sample -sd 0 -lr ${lr} -ne 2000 -s 0 -ule 1 -mg 200 -mig 5"
         echo $params
         sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
         done
     done
+    
+    
+# Runs as proposed by Mo and some additional changes
+params="-d mo/ -akl 0.1 -aklq 0.45 -ra 0 -uh 0 -b study_sample -sd 0 -ne 500 -s 0 -mig 3 -hls 830,830,830 -dll softplus -aea 100 -aeaq 100 -wd 0"
+sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
 
+params="-d mo/ -akl 0.1 -aklq 0.45 -ra 0 -uh 0 -b study_sample -sd 0 -ne 500 -s 1 -mig 3 -hls 840,840,840 -dll softplus -aea 100 -wd 0"
+sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
+
+params="-d mo/ -a 0.1,0.9 -akl 0.1 -aklq 0.45 -ra 0 -uh 0 -b study_sample -sd 0 -ne 500 -s 0 -mig 3 -mg 200 -hls 830,830,830 -dll softplus -aea 100 -wd 0"
+sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
+
+for aklq in 0.01 0.05 0.1 0.2 0.3 0.6 0.8 1 5
+    do
+    params="-d mo/ -a 0.1,0.9 -akl 0.1 -aklq ${aklq} -ra 0 -uh 0 -b study_sample -sd 0 -ne 500 -s 0 -mig 3 -mg 200 -hls 830,830,830 -dll softplus -aea 100 -wd 0"
+    sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
+    done
+
+# Save model that looks good
+params="-d mo/ -a 0.1,0.9 -akl 0.1 -aklq 0.1 -ra 0 -uh 0 -b study_sample -sd 0 -ne 500 -s 1 -mig 3 -mg 200 -hls 830,830,830 -dll softplus -aea 100 -wd 0"
+sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
+
+params="-d mo/ -a 0,1 -akl 0.1 -aklq 0.1 -ra 0 -uh 0 -b study_sample -sd 0 -ne 500 -s 1 -mig 3 -mg 200 -hls 830,830,830 -dll softplus -aea 100 -wd 0"
+sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
 #__________________________________________________
 # STZ query 
 
@@ -192,7 +215,7 @@ for akl in 20 40 60
         do
         for ule in 0 1
             do
-            params="-d initial_runs/ -a 0.1,0.9 -akl ${akl} -ra 0 -uh 0 -b study_sample -sd 0 -lr ${lr} -ne 2000 -s 0 -ule ${ule} -mg 200"
+            params="-d initial_runs/ -a 0.1,0.9 -akl ${akl} -ra 0 -uh 0 -b study_sample -sd 0 -lr ${lr} -ne 2000 -s 0 -ule ${ule} -mg 200 -mig 5"
             echo $params
             sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
             done
