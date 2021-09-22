@@ -26,6 +26,7 @@ from matplotlib import rcParams
 import matplotlib.pyplot as plt
 import matplotlib
 import seaborn as sns
+from pathlib import Path
 
 from sklearn.metrics import f1_score
 
@@ -39,13 +40,16 @@ importlib.reload(atu)
 import scripts.annotation_transfer_utils as atu
 
 # %%
-sc._settings.settings._vector_friendly=True
-
-# %%
 path_gmt='/storage/groups/ml01/code/karin.hrovatin//qtr_intercode_reproducibility-/metadata/'
 path_data='/storage/groups/ml01/workspace/karin.hrovatin//data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ_rmNodElimination/'
 subdir='mo/'
 params_name='a_p0.0r1.0-akl_0.1-aklq_0.1-ra_0-uh_0-b_study_sample-sd_False-dp_0.01-lr_0.001-hls_830.830.830-es_1-nh_10000-ne_500-dll_softplus-ule_False-mg_200-mig_3-aea_100-aeaq_None-wd_0.0'
+path_fig=path_data+subdir+'figures/'
+path_res=path_data+subdir+'results/'
+
+# %%
+sc._settings.ScanpyConfig.figdir=Path(path_fig)
+sc._settings.settings._vector_friendly=True
 
 # %%
 # Load adata used for integration
@@ -103,7 +107,8 @@ for ct in scores:
     data=pd.DataFrame({'bf':scores[ct]['bf']},
                       index=[t.replace(db+'_','') for t in adata.uns['terms'][terms_idx]])
     data.index.name='term'
-    display(data.sort_values('bf',ascending=False).iloc[:10])
+    data=data.sort_values('bf',ascending=False)
+    display(data.iloc[:10])
 
 # %% [markdown]
 # For most cell types the most highly enriched terms represent true cell types. In other cases these cell types can be infered based on knowldge about the organ. For example, acinar, gamma, and stellate enrichment tables contain the correct cell type further down the enrichment list and the cell types with higher ranking, such as hepatoblasts (hepatic progenitor cells), principal cells (located in kidney), and adipocytes, can be excluded due to lack of presence in pancreas. Namely, some cell types are similar across organs, leading to high scores for related cell type from different organs. This can be clearly seen for ductal cells, which are among others strongly enriched for cholangiocytes (bile duct epithelium), hepatoblasts (progenitors of hepatocyte and cholangiocytes), microfold cells (part of gut epithelium), and other epithelial cells. This information leads us to conclude that this cell cluster likely contains epithelial cells, such as ductal cells. To avoid interference of cell types from other tissues one could exclude non-organ related cell type terms before integration or enrichment.
@@ -148,17 +153,21 @@ terms_ct={'PANGLAO_ACINAR_CELLS':['acinar'],
 # %%
 # Plot term distn
 rcParams['figure.figsize']=(10,4)
-for term, cts in terms_ct.items():
+fig,axs=plt.subplots(len(terms_ct),1,figsize=(10,6*len(terms_ct)))
+for idx,(term, cts) in enumerate(terms_ct.items()):
+    cts=cts.copy() # Copy cts so that list is not modified in place
+    ax=axs[idx]
     term_idx=np.argwhere(adata.uns['terms']==term)[0][0]
     adata.obs[term]=adata.obsm['X_qtr_directed'][:,term_idx]                                     
-    p=sc.pl.violin(adata, keys=term, groupby='cell_type',stripplot=False,rotation=90,show=False)
+    sc.pl.violin(adata, keys=term, groupby='cell_type',stripplot=False,rotation=90,show=False,
+                  ax=ax)
     # Mark ct median
     ct_median=adata.obs.query('cell_type in @cts')[term].median()    
-    p.axhline(ct_median,c='k')
+    ax.axhline(ct_median,c='k')
     # Mark ct
     ct_idxs=[np.argwhere(adata.obs.cell_type.cat.categories.values==cti)[0,0] for cti in cts]
     for ct_idx in ct_idxs:
-        p.axvline(ct_idx,c='r')
+        ax.axvline(ct_idx,c='r')
     # Mark related cell types
     # Fix for stellate cells as doublets do not have subtype info
     if term=='PANGLAO_PANCREATIC_STELLATE_CELLS':
@@ -168,8 +177,10 @@ for term, cts in terms_ct.items():
     ct_idxs=[np.argwhere(adata.obs.cell_type.cat.categories.values==cti)[0,0] 
              for cti in related_cts]
     for ct_idx in ct_idxs:
-        p.axvline(ct_idx,c='orange')
+        ax.axvline(ct_idx,c='orange')
     adata.obs.drop(term,axis=1,inplace=True)
+fig.tight_layout()
+plt.savefig(path_fig+'cellTypeScore_distributions.pdf',dpi=300)
 
 # %% [markdown]
 # Note: Endocrine proliferative cells have high scores for different endocrine cell types as they contain multiple endocrine cell types (including alpha, beta, delta). They are not marked as belonging to either of these cell types due to not being resolved on cell-type level.
@@ -196,7 +207,9 @@ adata.obs[plot_terms]=adata.obsm['X_qtr_directed'][:,plot_terms_idx]
 rcParams['figure.figsize']=(6,6)
 # Set colormap values for plotting, no min/max
 sc.pl.umap(adata,color=plot_terms,s=10,
-           cmap='coolwarm',vcenter=0)
+           cmap='coolwarm',vcenter=0,
+          save='_pancreasCT_scores.pdf'
+          )
 adata.obs.drop(plot_terms,axis=1,inplace=True)
 
 # %% [markdown]
@@ -243,11 +256,14 @@ sc.tl.umap(adata_latent_q)
 # %%
 # Comparison of predicted and manually annotated cell types
 atu.plot_true_vs_pred(adata_latent_q=adata_latent_q,ct_col=ct_col)
+plt.savefig(path_fig+'annotation_transfer_cellTypes.pdf',dpi=300)
 
 # %%
 # Prediction certainty
 rcParams['figure.figsize']=(6,6)
-sc.pl.umap(adata_latent_q,  color=["evaluation",'uncertainty'], frameon=False,  size=10)
+sc.pl.umap(adata_latent_q,  color=["evaluation",'uncertainty'], frameon=False,  size=10,
+          save='_annotation_transfer_uncertainty.pdf'
+          )
 
 # %% [markdown]
 # Cell clusters with low prediction probability (e.g. immune) can be annotated based on cell type term scores, either with enrichment of cell clusters (as shown above) or with plots of score distributions of cell types expected to occur in the sample tissue.
@@ -256,10 +272,68 @@ sc.pl.umap(adata_latent_q,  color=["evaluation",'uncertainty'], frameon=False,  
 plot_terms=list(terms_ct.keys())
 rcParams['figure.figsize']=(6,6)
 # Set colormap values for plotting, no min/max
-sc.pl.umap(adata_latent_q,color=plot_terms,s=10,cmap='coolwarm',vcenter=0)
+sc.pl.umap(adata_latent_q,color=plot_terms,s=10,cmap='coolwarm',vcenter=0,
+           save='_query_pancreasCT_scores.pdf'
+          )
 
 # %% [markdown]
 # This helps us to identify some cell types that were not predicted, such as immune cells (absent from reference) and acinar cells (low number of cells).
+
+# %% [markdown]
+# #### Cell type-term enrichment per cell cluster of query
+# Try to annotate cell clusters based on cell type score enrichment.
+# Perform OvR enrichment of each cell cluster vs rest (OvR) and report previously annotated main cell types and samples in that cluster.
+
+# %%
+# Cluster cells
+sc.tl.leiden(adata_latent_q,resolution=2)
+
+# %%
+# Plot clusters
+rcParams['figure.figsize']=(5,5)
+sc.pl.umap(adata_latent_q,color=['cell_type','leiden'],wspace=0.9)
+
+# %%
+# Prepare cell groups for enrichment
+ct_dict={}
+for ct in adata_latent_q.obs.leiden.cat.categories:
+    ct_dict[ct]=adata_latent_q.obs_names[adata_latent_q.obs.leiden == ct].tolist()
+# Use only Panglao terms
+db='PANGLAO'
+terms_idx=np.argwhere([t.startswith(db) for t in adata.uns['terms']]).ravel()
+# Cell type scores on query data
+np.random.seed(0)
+torch.manual_seed(0)
+scores = model.latent_enrich(ct_dict, comparison="rest", directions=directions, 
+                             adata=adata[adata.obs.ref_query=='query',:],
+                            select_terms=terms_idx,n_perm=10000)
+
+# Print out results - top scores (directed)
+for ct in scores:
+    # Count N cells in cell type
+    print('\n Cluster',ct,'N cells:',len(ct_dict[ct]))
+    # Main cell types in cluster
+    ct_counts=adata_latent_q[ct_dict[ct],:].obs.cell_type.value_counts(normalize=True)
+    display(ct_counts[ct_counts>0.2])
+    # Main sample in cluster
+    design_counts=adata_latent_q[ct_dict[ct],:].obs.design.value_counts(normalize=True)
+    display(design_counts)
+    
+    # Scores display
+    data=pd.DataFrame({'bf':scores[ct]['bf']},
+                      index=[t.replace(db+'_','') for t in adata.uns['terms'][terms_idx]])
+    data.index.name='term'
+    display(data.sort_values('bf',ascending=False).iloc[:10])
+
+# %% [markdown]
+# Per cluster enrichments in many cases enable correct cluster annotation. However, there are some exceptions:
+# - In some cases dublet status is not clear from the enrichment. However, when plotting cell scores on UMAP (as above) this can be easily resolved. 
+# - Proliferative cells are not identified as we did not use a gene set specific for proliferative cells. Users could thus add proliferative markers gene set to analysis.
+# - Beta cell clusters with cells comming from predominately healthy control sample had enrichment for beta cells. However, beta cell clusters containing mainly cells from STZ treated diseased samples were often not enriched for beta cell gene set. This is in accordance to known dedifferentiation and loss of identity of beta cells after STZ treatment. However, by looking at beta cell score on the above UMAPs one can clearly identify the beta cell cluster, showing variable beta cell score strength in accordance to STZ treatment (see also distribution of beta cell related scores vs sample status below). 
+#
+# The lack of apropriate enrichment in some clusters might be also due to the use of OvR enrichment, leading to presence of cells of the same cell type in both query and reference group at the same time. Thus we suggest users to rather plot cell type scores of interest on UMAP (see above) to help resolve cell type identity. 
+#
+# Furthermore, plotting cell type scores on UMAP can help to identify lack of clustering resolution, such as in our cluster 19. This cluster contain both alpha-immune doublets and immune cells, as can be clearly observed from the UMAPs showing cell type scores (above). Thus, score UMAPs can help us select appropriate clustering and sub-sclustering resolutions to ease the annotatiuon process.
 
 # %% [markdown]
 # ## Beta cell function - T2D model vs healthy
@@ -272,27 +346,170 @@ sc.pp.neighbors(adata_beta, use_rep='X_qtr_directed')
 sc.tl.umap(adata_beta)
 
 # %% [markdown]
-# ### Healthy and diseased beta cell embedding
+# ### Separation of healthy and STZ-treated beta cells
+
+# %%
+# Report cell as belonging to ref or one of the query designs
+adata_beta.obs['ref_querySample']=pd.Categorical(pd.Series(
+    [rq if rq=='ref' else design
+    for rq, design in zip(adata_beta.obs.ref_query,adata_beta.obs.design)],
+    dtype='category',index=adata_beta.obs_names),
+     categories=['STZ','STZ_GLP-1','STZ_estrogen','STZ_GLP-1_estrogen',
+                'STZ_insulin','STZ_GLP-1_estrogen+insulin','control','ref'],
+     ordered=True)
+
+# Set colors 
+colormap={'STZ':'cyan',
+          'STZ_GLP-1':'tab:purple','STZ_estrogen':'tab:pink','STZ_GLP-1_estrogen':'pink',
+         'STZ_insulin':'orange','STZ_GLP-1_estrogen+insulin':'gold',
+         'control':'yellowgreen', 'ref':'k'}
+adata_beta.uns['ref_querySample_colors']=[
+    colormap[cat] for cat in adata_beta.obs['ref_querySample'].cat.categories]
+
+# Set same colors in latent query adata
+adata_latent_q.obs['design']=pd.Categorical(
+    adata_latent_q.obs.design,
+     categories=[c for c in adata_beta.obs.ref_querySample.cat.categories 
+                 if c in adata_latent_q.obs.design.unique()],
+    ordered=True)
+adata_latent_q.uns['design_colors']=[
+    colormap[cat] for cat in adata_latent_q.obs['design'].cat.categories]
+
+# %% [markdown]
+# #### Loss of beta cell identity
+
+# %% [markdown]
+# Beta cells are known to be dedifferentiated and losse their identity in diabetes and upon STZ treatment. Thus we compare beta cell and and other cell type socres in healthy and STZ-treated beta cells. 
+#
+# Each plot highlights a subset of cells, the rest are marked in pale gray.
+
+# %%
+# Plot terms in beta cells
+terms_plot=['BETA_CELLS','PANCREATIC_PROGENITOR_CELLS']
+for term in terms_plot:
+    adata_beta.obs[term]=adata_beta.obsm[
+        'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='PANGLAO_'+term)[0][0]]
+np.random.seed(0)
+random_indices=np.random.permutation(list(range(adata_beta.shape[0])))
+fig,ax=plt.subplots(2,2,figsize=(12,8),sharey=True,sharex=True)
+sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+              color='ref_querySample',groups='ref',ax=ax[0,0],show=False) 
+ax[0,0].set_title('Reference')
+sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+              color='ref_querySample',
+              groups=[group for group in adata_beta.obs.ref_querySample.cat.categories
+                      if group!='ref'], ax=ax[0,1],show=False)
+ax[0,1].set_title('Query')
+sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+              color='ref_querySample',groups='control',ax=ax[1,0],show=False) 
+ax[1,0].set_title('Query healthy')
+sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+              color='ref_querySample',groups='STZ',ax=ax[1,1],show=False)
+ax[1,1].set_title('Query STZ (diabetic)')
+plt.subplots_adjust(left=None, bottom=None, right=None, top=None, 
+                    wspace=0.6, hspace=0.4)
+adata_beta.obs.drop(terms_plot,axis=1,inplace=True)
+fig.tight_layout()
+plt.savefig(path_fig+'beta_identity_progenitor.pdf',dpi=300)
+
+# %%
+# Plot terms in beta cells
+terms_plot=['BETA_CELLS','ENTEROENDOCRINE_CELLS']
+for term in terms_plot:
+    adata_beta.obs[term]=adata_beta.obsm[
+        'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='PANGLAO_'+term)[0][0]]
+np.random.seed(0)
+random_indices=np.random.permutation(list(range(adata_beta.shape[0])))
+fig,ax=plt.subplots(2,2,figsize=(12,8),sharey=True,sharex=True)
+sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+              color='ref_querySample',groups='ref',ax=ax[0,0],show=False) 
+ax[0,0].set_title('Reference')
+sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+              color='ref_querySample',
+              groups=[group for group in adata_beta.obs.ref_querySample.cat.categories
+                      if group!='ref'], ax=ax[0,1],show=False)
+ax[0,1].set_title('Query')
+sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+              color='ref_querySample',groups='control',ax=ax[1,0],show=False) 
+ax[1,0].set_title('Query healthy')
+sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+              color='ref_querySample',groups='STZ',ax=ax[1,1],show=False)
+ax[1,1].set_title('Query STZ (diabetic)')
+plt.subplots_adjust(left=None, bottom=None, right=None, top=None, 
+                    wspace=0.6, hspace=0.4)
+adata_beta.obs.drop(terms_plot,axis=1,inplace=True)
+fig.tight_layout()
+plt.savefig(path_fig+'beta_identity_enteroendocrine.pdf',dpi=300)
+
+# %% [markdown]
+# We can see that STZ treated cells have lower beta cell score than healthy control. Similarly, they have higher scores for pancreatic progenitors and enteroendocrine cells. This agrees with previousn research on diabetes-related dedifferentiation of beta cells.
+#
+# We can also see that using multiple scores helps us to better distinguish between healthy and diseased populations than using a single score.
+
+# %% [markdown]
+# Below we check most enriched cell type terms separating healthy control and STZ treated query beta cells, which could indicate differentiation towards other cell types in diabetic condition.
+
+# %%
+# Compare WT and STZ beta cells from STZ study
+condition_dict={
+    'beta_STZ':adata.obs.query('study_sample=="STZ_G2" & cell_type=="beta"').index.tolist(),
+    'beta_control':adata.obs.query('study_sample=="STZ_G1" & cell_type=="beta"').index.tolist()
+               }
+# Use PANGLAO terms
+db='PANGLAO'
+terms_idx=np.argwhere([t.startswith(db) for t in adata.uns['terms']]).ravel()
+# Cell type scores
+np.random.seed(0)
+torch.manual_seed(0)
+scores = model.latent_enrich(
+    condition_dict, comparison="beta_control", directions=directions, adata=adata, 
+    select_terms=terms_idx,n_perm=10000)
+
+# Print out results
+for ct in scores:
+    print('beta cells: STZ-treated vs control')
+    data=pd.DataFrame({'bf':scores[ct]['bf']},
+                      index=[t.replace(db+'_','') for t in adata.uns['terms'][terms_idx]])
+    data.index.name='term'
+    data=data.query('abs(bf)>1').sort_values('bf',ascending=False,key=abs)
+    max_rows=pd.options.display.max_rows
+    pd.options.display.max_rows=data.shape[0]
+    display(data.head(10))
+
+# %% [markdown]
+# Some of the enriched terms could be enriched due to ambience effects resulting from potential changes in cell type composition across samples. However, other might indicate true biological difference, such as enteroendocrine cells (umbrella term for different endocrine cells, including pancreatic endocrine cells) that could indicate transdiferentiation towards other pancreatic endocrine cell types, as was previously suggested.
+
+# %%
+# Plot endocrine score distribution in beta cells and unrelated cell type
+cts=['beta','immune']
+fig,ax=plt.subplots(len(cts),1,figsize=(6,4*len(cts)),sharex=True)
+for idx,ct in enumerate(cts):
+    sc.pl.violin(adata_latent_q[adata_latent_q.obs.cell_type==ct,:], 
+                 keys='PANGLAO_ENTEROENDOCRINE_CELLS', groupby='design',rotation=90,
+            #stripplot=False,
+                 ax=ax[idx],show=False)
+    ax[idx].set_title(ct)
+    if idx!=0:
+        ax[idx].set_ylabel('')
+    else:
+        ax[idx].set_ylabel('enteroendocrine score')
+fig.tight_layout()
+
+# %% [markdown]
+# We observed marked increase in enteroendocrine score in STZ-treated beta cells compared to healthy control beta cells. We do not observe such a trend in an unrelated cell type (immune cells), which indicates that this is likely not due to cell type composition-related ambient effects.
+
+# %% [markdown]
+# #### Embedding separation
 # Compare beta-cell embedding of healthy, T2D model, and treated T2D model to reference data.
 
 # %%
 # Compare query samples embedding to reference
-# Report cell as belonging to ref or one of the query designs
-adata_beta.obs['ref_querySample']=pd.Series(
-    [rq if rq=='ref' else design
-    for rq, design in zip(adata_beta.obs.ref_query,adata_beta.obs.design)],
-    dtype='category',index=adata_beta.obs_names)
-# Set colors 
-colormap={'STZ':'cyan',
-          'STZ_GLP-1':'tab:purple','STZ_estrogen':'tab:pink','STZ_GLP-1_estrogen':'pink',
-         'STZ_GLP-1_estrogen+insulin':'orange','STZ_insulin':'gold',
-         'control':'yellowgreen', 'ref':'k'}
-adata_beta.uns['ref_querySample_colors']=[
-    colormap[cat] for cat in adata_beta.obs['ref_querySample'].cat.categories]
 # Randomly order cells in UMAP
+rcParams['figure.figsize']=(6,6)
 np.random.seed(0)
 random_indices=np.random.permutation(list(range(adata_beta.shape[0])))
-sc.pl.umap(adata_beta[random_indices,:],color='ref_querySample',s=10)
+sc.pl.umap(adata_beta[random_indices,:],color='ref_querySample',s=10,
+          save='_betaCells.pdf')
 
 # %% [markdown]
 # Healthy reference cells (named control) map mainly with reference cells (which are not T2 diabetic). Cells treated with STZ (T2 diabetes model) map largely to a different location.
@@ -323,27 +540,20 @@ for ct in scores:
     data=pd.DataFrame({'bf':scores[ct]['bf']},
                       index=[t.replace(db+'_','') for t in adata.uns['terms'][terms_idx]])
     data.index.name='term'
-    data=data.query('abs(bf)>1').sort_values('bf',ascending=False,key=abs)
+    data=data.sort_values('bf',ascending=False,key=abs)
+    data.to_csv(path_res+'diabetes_reactomeEnrichment.tsv',sep='\t')
+    data_enr=data.query('abs(bf)>1')
     max_rows=pd.options.display.max_rows
-    pd.options.display.max_rows=data.shape[0]
-    def style_pos_neg(v):
-        if v>0:
-            return 'color:black;background-color:#cc6868;'
-        elif v<0:
-            return 'color:black;background-color:#6890cc;'
-        else:
-            return 'color:black;background-color:white;'
-    def style_positive(v, props=''):
-        return props if v < 0 else None
-    display(data.style.applymap(style_pos_neg))
+    pd.options.display.max_rows=data_enr.shape[0]
+    display(data_enr)
     pd.options.display.max_rows=max_rows
 
 # %% [markdown]
-# There seem to be differences in: energy metabolism and protein synthesis, unfolded protein response, cell-cell and cell-matrix interactions (including immune communication).
+# There seem to be differences in: energy metabolism and protein synthesis, unfolded protein response, cell-matrix interactions and cell-cell (including immune communication).
 
 # %%
 # Differential terms for plotting below
-plot_terms=data.index
+plot_terms=data_enr.index
 
 # %% [markdown]
 # #### Enriched gene set overlap
@@ -375,113 +585,7 @@ terms_genes_map.fillna(0,inplace=True)
 sns.clustermap(terms_genes_map,xticklabels=False,method='ward')
 
 # %% [markdown]
-# Overlap between enriched term genes as ratio of smaller gene set. Bf direction is marked with edge colors as above in enrichment table.
-
-# %%
-# Overlap between terms as ratio of smaller gene set
-terms_overlap=pd.DataFrame()
-for i in range(len(plot_terms)-1):
-    for j in range(i+1,len(plot_terms)):
-        t1=plot_terms[i]
-        t2=plot_terms[j]
-        g1=terms_genes[db+'_'+t1]
-        g2=terms_genes[db+'_'+t2]
-        metric=len(g1&g2)/min([len(g1),len(g2)])
-        terms_overlap.at[t1,t2]=metric
-        terms_overlap.at[t2,t1]=metric
-terms_overlap.fillna(1,inplace=True)        
-
-# %%
-# Colors for terms - red if positive, else blue
-term_direction_colors=pd.Series({term:'#cc6868' if term_data['bf']>0 else '#6890cc'
-                       for term,term_data in data.iterrows()})
-
-# %%
-# Visualise overlap between terms
-sns.clustermap(terms_overlap,row_colors=term_direction_colors,col_colors=term_direction_colors)
-
-# %% [markdown]
 # The enriched gene sets do not have many overlapping terms. This is likely due to using high regularisation parameter alpha in integration for Reactome terms, leading to deactivation of redundant gene-set terms.
-
-# %% [markdown]
-# TODO: Some terms with high overlap do not have same enrichment direction.
-
-# %% [markdown]
-# #### Term genes expression across samples
-# Compare gene-term gene means in the two conditions to check if score direction is correct. TODO remove/Unused as gene-wise means in one condition are more often higher than in the other condition.
-
-# %%
-# Normalised expression of genes in both conditions, using only genes used for integration
-adata_beta_g1g2=adata_beta[adata_beta.obs.study_sample.isin(['STZ_G1','STZ_G2']),:].copy()
-sc.pp.normalize_total(adata_beta_g1g2, target_sum=1e6, exclude_highly_expressed=True) #TODO change this
-
-m1=adata_beta_g1g2[(adata_beta_g1g2.obs.study_sample=='STZ_G1').values &
-              (adata_beta_g1g2.obs.cell_type=='beta').values,:].X.mean(axis=0)
-m2=adata_beta_g1g2[(adata_beta_g1g2.obs.study_sample=='STZ_G2').values &
-              (adata_beta_g1g2.obs.cell_type=='beta').values,:].X.mean(axis=0)
-print('Ratio of genes with mean G1>G2:',sum(m1>m2)/m1.shape[0])
-
-adata_temp=sc.pp.log1p(adata_beta_g1g2,copy=True)
-
-# Differences between gene-wise means get biased after log transform
-m1=adata_temp[(adata_temp.obs.study_sample=='STZ_G1').values &
-              (adata_temp.obs.cell_type=='beta').values,:].X.mean(axis=0)
-m2=adata_temp[(adata_temp.obs.study_sample=='STZ_G2').values &
-              (adata_temp.obs.cell_type=='beta').values,:].X.mean(axis=0)
-print('Ratio of genes with mean G1>G2 after log transformation:',sum(m1>m2)/m1.shape[0])
-del adata_temp
-
-# %%
-# Normalised expression computed on all expressed genes
-adata_full=sc.read('/storage/groups/ml01/workspace/karin.hrovatin/data/pancreas/scRNA/qtr/adata_annotated.h5ad')
-
-m1=np.array(adata_full[(adata_full.obs.study_sample=='STZ_G1').values &
-              (adata_full.obs.cell_type=='beta').values,:].X.mean(axis=0)).ravel()
-m2=np.array(adata_full[(adata_full.obs.study_sample=='STZ_G2').values &
-              (adata_full.obs.cell_type=='beta').values,:].X.mean(axis=0)).ravel()
-print('Ratio of genes with mean G1>G2:',
-      sum(m1>m2)/m1.shape[0])
-
-# %%
-# Plot term genes expression in both conditions
-for term in plot_terms:
-    #print(term,'bf:',data.at[term,'bf'])
-    genes=list(terms_genes[db+'_'+term])
-    #sc.pl.matrixplot(
-    #    adata_beta_g1g2, 
-    #    var_names=genes, 
-    #    groupby='design', use_raw=False,standard_scale='var')
-    m1=adata_beta_g1g2[(adata_beta_g1g2.obs.study_sample=='STZ_G1').values &
-              (adata_beta_g1g2.obs.cell_type=='beta').values,genes].X.mean(axis=0)
-    m2=adata_beta_g1g2[(adata_beta_g1g2.obs.study_sample=='STZ_G2').values &
-              (adata_beta_g1g2.obs.cell_type=='beta').values,genes].X.mean(axis=0)
-    lm_ratios=np.log2((m2+1)/(m1+1))
-    fig,ax=plt.subplots(figsize=(3,3))
-    plt.hist(lm_ratios.tolist())
-    plt.title(term+' bf: '+str(data.at[term,'bf']))
-    plt.xlabel('log2(mean_STZ+1/mean_control+1)')
-    plt.axvline(0,c='r')
-    plt.grid(b=None)
-    display(fig)
-    plt.close()
-    #m_lm_ratio=np.mean(lm_ratios)
-    #print('Mean log2 ratio of group-wise means mean(log2(m_STZ+1/m_control+1)):',m_lm_ratio)
-
-# %% [markdown]
-# TODO: Distribution of term-associated genes log ratios of means in STZ vs control condition do not match bf direction.
-
-# %%
-# How many genes present in multiple active terms have both positive and negative weights?
-print('Ratio of genes present in multiple active terms that have weights of different directions across terms',
-      # has positive weight
-      ((model.model.decoder.L0.expr_L.weight.detach().numpy()>0).any(axis=1) & 
-       # has negative weight
-      (model.model.decoder.L0.expr_L.weight.detach().numpy()<0).any(axis=1) ).sum() / 
-      # N terms present in >1 active terms
-      ((model.model.decoder.L0.expr_L.weight.detach().numpy()!=0).sum(axis=1)>1).sum()) 
-
-# %% [markdown]
-# TODO what to do with this? Genes have different weights across terms.
 
 # %% [markdown]
 # #### Distribution of term scores across conditions
@@ -503,49 +607,22 @@ swarmplot_df['ref_querySample']= pd.Categorical(swarmplot_df['ref_querySample'],
                       categories=[c for c in list(colormap.keys()) 
                                   if c in swarmplot_df['ref_querySample'].unique()],
                       ordered=True)
-swarmplot_df['term']= pd.Categorical(swarmplot_df['term'], 
-                      categories=g.data2d.index,
-                      ordered=True)
 
 # %%
 # Plot distribution of term scores across STZ samples
-sns.catplot(x="score", y="ref_querySample",
+a=sns.catplot(x="score", y="ref_querySample",
             row="term",orient="h",
             data=swarmplot_df, 
             kind="violin",inner=None,
             height=4, aspect=0.7, sharex=False,
             palette=[colormap[c] for c in swarmplot_df['ref_querySample'].cat.categories])
+plt.savefig(path_fig+'diabetes_reactomeEnrichment.pdf',dpi=300,bbox_inches='tight')
 
 # %% [markdown]
 # #### Correlation of enriched terms
 # Do terms change differently across STZ samples, thus being up/down regulated at different disease severities? For example, it would be possible that some terms show strongest change in severe T2D (e.g. between STZ and insulin treated samples), while others show change latter during healing course, between insluin-treated and healthy samples. If this was the case one would expect to see subgroups of terms with stronger enrichment.
 #
-# Compute correlation between terms using STZ-study beta cells from different conditions.
-#
-# TODO remove as no interesting results
-
-# %%
-# Correlation between terms on STZ-beta cells
-term_correlation=pd.DataFrame(index=plot_terms,columns=plot_terms)
-for ii in range(len(plot_terms)-1):
-    for ij in range(ii+1,len(plot_terms)):
-        corr=np.corrcoef(latent_enr.iloc[:,ii],latent_enr.iloc[:,ij])[0,1]
-        t1=plot_terms[ii]
-        t2=plot_terms[ij]
-        term_correlation.at[t1,t2]=corr
-        term_correlation.at[t2,t1]=corr
-for ii in range(len(plot_terms)):
-    term_correlation.at[plot_terms[ii],plot_terms[ii]]=1
-
-# %%
-# Plot term correlation
-g=sns.clustermap(term_correlation.astype('float'),cmap='coolwarm',vmin=-1,vmax=1,center=0)
-
-# %% [markdown]
-# Despite separation on up/down regulated terms there seems to be no subclusters within up/down regulated terms.
-
-# %% [markdown]
-# Same as above, but multiplying correlation of terms with oposite bf with -1.
+# Compute correlation between terms using STZ-study beta cells from different conditions. We multiply correlation between terms with oposite direction of change (e.g. bf from enrichment analysis) with -1 to ensure that we do not get negative corelations for opositely oriented terms.
 
 # %%
 # Correlation between terms on STZ-beta cells, multiply by -1 if terms have oposite bf
@@ -566,3 +643,6 @@ for ii in range(len(plot_terms)):
 # %%
 # Plot term correlation
 g=sns.clustermap(term_correlation.astype('float'),cmap='coolwarm',vmin=-1,vmax=1,center=0)
+
+# %% [markdown]
+# We do not see any clear separation of terms into different groups.
