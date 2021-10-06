@@ -579,10 +579,14 @@ for term in plot_terms:
     genes=terms_genes[db+'_'+term]
     terms_genes_map.loc[term,genes]=1
 terms_genes_map.fillna(0,inplace=True)
+# Add axis names for plotting
+terms_genes_map.index.name='Gene sets'
+terms_genes_map.columns.name='Genes'
 
 # %%
 # Plot genes present in each term
 sns.clustermap(terms_genes_map,xticklabels=False,method='ward')
+plt.savefig(path_fig+'diabetes_reactomeEnrichment_gsOverlap.pdf',dpi=300,bbox_inches='tight')
 
 # %% [markdown]
 # The enriched gene sets do not have many overlapping terms. This is likely due to using high regularisation parameter alpha in integration for Reactome terms, leading to deactivation of redundant gene-set terms.
