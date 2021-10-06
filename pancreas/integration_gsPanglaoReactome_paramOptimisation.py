@@ -153,7 +153,7 @@ adata.obs['ref_query']=['ref' if study!=study_query else 'query'
 adata_r=adata.raw.to_adata()[adata.obs.study!=study_query,:]
 adata_r.obs['cell_type']=adata[adata_r.obs_names,:].obs.cell_type
 print('Ref shape:',adata_r.shape)
-# Ductal cells and ductal dublets not included in ref
+# Query-specific cells and their dublets not included in ref
 adata_r=adata_r[~adata_r.obs.cell_type.str.contains(ct_query),:]
 # Remove genes expressed in < 20 cells in ref
 adata_r=adata_r[:,(adata_r.X!=0).sum(axis=0)>=20].copy()
@@ -231,11 +231,7 @@ if args.save:
     adata_integration.write(path_save+'adata_integration_RefQueryTraining_'+args_name+'.h5ad')
     print(path_save+'adata_integration_RefQueryTrainingg_'+args_name+'.h5ad')
     del adata_integration
-    # Integration data shape: (82077, 6571)
-    # /storage/groups/ml01/workspace/karin.hrovatin/data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ_rmNodElimination/model/adata_integration_RefQueryTraining.h5ad
-    # Integration data shape: (133213, 6849)
-    # /storage/groups/ml01/workspace/karin.hrovatin/data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ/model/adata_integration_RefQueryTraining.h5ad
-    
+
     # Save terms info
     pickle.dump(np.array(adata_r.uns['terms']),open(
         path_save+'terms_'+args_name+'.pkl',
