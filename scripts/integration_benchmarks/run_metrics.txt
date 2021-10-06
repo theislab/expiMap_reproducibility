@@ -3,18 +3,19 @@
 # Eval Karin:
 sbatch_script=$WSC/qtr_intercode_reproducibility-/scripts/integration_benchmarks/run_metrics.sbatch
 eval_script="$WSC"/qtr_intercode_reproducibility-/scripts/integration_benchmarks/run_metrics.py
-data_path=/storage/groups/ml01/workspace/karin.hrovatin/data/pancreas/scRNA/qtr/integrated/gsCellType_query/model/
-batch=study_sample
+data_path=/storage/groups/ml01/workspace/karin.hrovatin/data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ_rmNodElimination/mo/
+params="_a_p0.0r1.0-akl_0.1-aklq_0.1-ra_0-uh_0-b_study_sample-sd_False-dp_0.01-lr_0.001-hls_830.830.830-es_1-nh_10000-ne_500-dll_softplus-ule_False-mg_200-mig_3-aea_100-aeaq_None-wd_0.0"
+batch=ref_query
 cell_type=cell_type
 
 unset FILES
 declare -a FILES     
 
 #FILES[0]='data_integrated_try.h5ad;X_integrated'
-FILES[1]='adata_norm_integrated_RefQueryTraining.h5ad;X_qtr'
-FILES[2]='adata_norm_integrated_RefQueryTraining.h5ad;X_seurat'
-FILES[3]='adata_norm_integrated_RefQueryTraining.h5ad;X_scvi'
-FILES[4]='adata_norm_integrated_RefQueryTraining.h5ad;X_symphony'
+FILES[1]="adata_norm_integrated_forScib"${params}".h5ad;X_qtr"
+FILES[2]="adata_norm_integrated_forScib"${params}".h5ad;X_seurat"
+FILES[3]="adata_norm_integrated_forScib"${params}".h5ad;X_scvi"
+FILES[4]="adata_norm_integrated_forScib"${params}".h5ad;X_symphony"
 
 
 for i in "${!FILES[@]}"
