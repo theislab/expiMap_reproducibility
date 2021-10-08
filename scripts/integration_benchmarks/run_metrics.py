@@ -5,6 +5,7 @@ import os
 import numpy as np
 import warnings 
 import pickle
+import time
 
 from scIB import metrics as sm
 import scanpy as sc
@@ -94,7 +95,7 @@ if args.PC_regression:
     metrics['PC_regression']=sm.pcr_comparison(adata_pre=adata_full, 
                                                adata_post=latent_adata, 
                                                covariate=args.batch,
-                                        embed='X_emb', n_comps=10, scale=True, verbose=False)
+                                        embed='X_emb')
 
 # Batch ASW
 if args.ASW_batch:
@@ -103,20 +104,19 @@ if args.ASW_batch:
                                              batch_key=args.batch,
                                              group_key=args.cell_type,
                                              metric='euclidean',  embed='X_emb', 
-                                             verbose=False, scale=True
-                         )[1]['silhouette_score'].values.mean()
+                                             verbose=False, return_all=False,
+                         )
 
 # kBET
 if args.kBET:
     print('Computing kBET')
     try:
-        kBET_per_label=sm.kBET(adata=latent_adata, batch_key=args.batch, 
+        metrics['kBET']=sm.kBET(adata=latent_adata, batch_key=args.batch, 
                                label_key=args.cell_type, 
                                          embed='X_emb', 
                                      type_ = 'embed',
-                    hvg=False, subsample=0.5, heuristic=False, verbose=False) 
-
-        metrics['kBET']=1-np.nanmean(kBET_per_label['kBET'])
+                                scaled=True,
+                               verbose=False) 
 
     except sm.NeighborsError as err:
         metrics['kBET']=0
@@ -126,39 +126,47 @@ if args.kBET:
 # Graph connectivity
 if args.graph_connectivity:
     print('Computing graph_connectivity')
-    metrics['graph_connectivity']=sm.graph_connectivity(adata_post=latent_adata, 
+    metrics['graph_connectivity']=sm.graph_connectivity(adata=latent_adata, 
                                                         label_key=args.cell_type)
 
-# ### BIO,BATCH
-
-# Graph iLISI and cLISI
-if args.graph_cLISI or args.graph_iLISI:
-    print('Computing graph_LISI')
+# Graph  iLISI
+if args.graph_iLISI:
+    print('Computing graph_iLISI')
     try:
-        metrics_graph_iLISI, metrics_graph_cLISI = sm.lisi_graph(
+        metrics['graph_iLISI'] = sm.ilisi_graph(
             adata=latent_adata, batch_key=args.batch, 
-            label_key=args.cell_type, k0=90, type_= 'embed',
+             type_= 'embed',
                                   subsample=0.5*100, scale=True,
-                                        multiprocessing = True,nodes = 4, verbose=True)
-        
-        if  args.graph_iLISI: 
-            metrics['graph_iLISI']= metrics_graph_iLISI
-        if  args.graph_cLISI: 
-            metrics['graph_cLISI'] =  metrics_graph_cLISI
+                                        multiprocessing = True,verbose=False)
 
     except FileNotFoundError as err:
-        warnings.warn('Could not compute LISI scores due to FileNotFoundError')
-        metrics['graph_iLISI'], metrics['graph_cLISI'] =np.nan, np.nan
+        warnings.warn('Could not compute iLISI scores due to FileNotFoundError')
+        metrics['graph_iLISI'] =np.nan
         print("FileNotFoundError: {0}".format(err))
 
 # ### BIO
+
+# Graph  cLISI
+if args.graph_cLISI:
+    print('Computing graph_cLISI')
+    try:
+        metrics['graph_cLISI'] = sm.clisi_graph(
+            adata=latent_adata, batch_key=args.batch, 
+            label_key=args.cell_type,  type_= 'embed',
+                                  subsample=0.5*100, scale=True,
+                                        multiprocessing = True, verbose=False)
+
+    except FileNotFoundError as err:
+        warnings.warn('Could not compute cLISI scores due to FileNotFoundError')
+        metrics['graph_cLISI'] =np.nan
+        print("FileNotFoundError: {0}".format(err))
 
 # NMI
 if args.NMI:
     print('Computing NMI')
     metrics['NMI']=sm.nmi(adata=latent_adata, 
                           group1=args.cell_type, group2='opt_louvain', 
-                            method="arithmetic")
+                            method="arithmetic",nmi_dir=None)
 
 # ARI
 if args.ARI:
@@ -169,14 +177,15 @@ if args.ARI:
 # ASW cell type
 if args.ASW_cell_type:
     print('Computing ASW_cell_type')
-    metrics['ASW_cell_type']=sm.silhouette(latent_adata, 
+    metrics['ASW_cell_type']=sm.silhouette(adata=latent_adata, 
                                            group_key=args.cell_type, embed='X_emb', 
-                                           metric='euclidean',scale=True)
+                                           metric='euclidean')
 
 # ### Save metrics
 
-path_save=args.input_file.replace('.h5ad','')
-path_save=path_save+'_scIB_metrics_IE_'+args.integrated_embedding+\
-                 '_B_'+args.batch+'_CT_'+args.cell_type+'.pkl'
+metrics['adata_name']=args.input_file.split('/')[-1]
+path_save='/'.join(args.input_file.split('/')[:-1])+\
+                '/scIB_IE_'+args.integrated_embedding+\
+                '_B_'+args.batch+'_CT_'+args.cell_type+'_uid'+str(time.time())+'.pkl'
 pickle.dump(metrics,open(path_save,'wb'))
 print('Saved to:',path_save)
