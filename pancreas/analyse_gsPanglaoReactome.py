@@ -269,6 +269,14 @@ sc.pl.umap(adata_latent_q,  color=["evaluation",'uncertainty'], frameon=False,  
 # Cell clusters with low prediction probability (e.g. immune) can be annotated based on cell type term scores, either with enrichment of cell clusters (as shown above) or with plots of score distributions of cell types expected to occur in the sample tissue.
 
 # %%
+# Query celltypes
+# Prediction certainty
+rcParams['figure.figsize']=(6,6)
+sc.pl.umap(adata_latent_q,  color=["cell_type"], frameon=False,  size=10,
+          save='_query_celltypes.pdf'
+          )
+
+# %%
 plot_terms=list(terms_ct.keys())
 rcParams['figure.figsize']=(6,6)
 # Set colormap values for plotting, no min/max
@@ -579,14 +587,10 @@ for term in plot_terms:
     genes=terms_genes[db+'_'+term]
     terms_genes_map.loc[term,genes]=1
 terms_genes_map.fillna(0,inplace=True)
-# Add axis names for plotting
-terms_genes_map.index.name='Gene sets'
-terms_genes_map.columns.name='Genes'
 
 # %%
 # Plot genes present in each term
 sns.clustermap(terms_genes_map,xticklabels=False,method='ward')
-plt.savefig(path_fig+'diabetes_reactomeEnrichment_gsOverlap.pdf',dpi=300,bbox_inches='tight')
 
 # %% [markdown]
 # The enriched gene sets do not have many overlapping terms. This is likely due to using high regularisation parameter alpha in integration for Reactome terms, leading to deactivation of redundant gene-set terms.
