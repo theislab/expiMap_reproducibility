@@ -272,7 +272,7 @@ sc.pl.umap(adata_latent_q,  color=["evaluation",'uncertainty'], frameon=False,  
 # Query celltypes
 # Prediction certainty
 rcParams['figure.figsize']=(6,6)
-sc.pl.umap(adata_latent_q,  color=["cell_type"], frameon=False,  size=10,
+sc.pl.umap(adata_latent_q,  color=["cell_type"], size=10,
           save='_query_celltypes.pdf'
           )
 
