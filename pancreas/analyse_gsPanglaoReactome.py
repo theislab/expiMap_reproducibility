@@ -366,6 +366,11 @@ adata_beta.obs['ref_querySample']=pd.Categorical(pd.Series(
                 'STZ_insulin','STZ_GLP-1_estrogen+insulin','control','ref'],
      ordered=True)
 
+# Make study+design column
+adata_beta.obs['study_design']=[study+'_'+design for study,design in 
+                                zip(adata_beta.obs['study'],adata_beta.obs['design'])]
+adata_beta.obs['study_design']=adata_beta.obs['study_design'].astype('category')
+
 # Set colors 
 colormap={'STZ':'cyan',
           'STZ_GLP-1':'tab:purple','STZ_estrogen':'tab:pink','STZ_GLP-1_estrogen':'pink',
@@ -373,6 +378,10 @@ colormap={'STZ':'cyan',
          'control':'yellowgreen', 'ref':'k'}
 adata_beta.uns['ref_querySample_colors']=[
     colormap[cat] for cat in adata_beta.obs['ref_querySample'].cat.categories]
+study_colors_map={'Fltp_P16':'#D81B60','NOD':'#1E88E5',
+                  'STZ':'#FFC107','spikein_drug':'#004D40'}
+adata_beta.uns['study_colors']=[study_colors_map[s] 
+                                for s in adata_beta.obs['study'].cat.categories]
 
 # Set same colors in latent query adata
 adata_latent_q.obs['design']=pd.Categorical(
@@ -397,21 +406,19 @@ terms_plot=['BETA_CELLS','PANCREATIC_PROGENITOR_CELLS']
 for term in terms_plot:
     adata_beta.obs[term]=adata_beta.obsm[
         'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='PANGLAO_'+term)[0][0]]
-np.random.seed(0)
-random_indices=np.random.permutation(list(range(adata_beta.shape[0])))
 fig,ax=plt.subplots(2,2,figsize=(12,8),sharey=True,sharex=True)
-sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',groups='ref',ax=ax[0,0],show=False) 
 ax[0,0].set_title('Reference')
-sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',
               groups=[group for group in adata_beta.obs.ref_querySample.cat.categories
                       if group!='ref'], ax=ax[0,1],show=False)
 ax[0,1].set_title('Query')
-sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',groups='control',ax=ax[1,0],show=False) 
 ax[1,0].set_title('Query healthy')
-sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',groups='STZ',ax=ax[1,1],show=False)
 ax[1,1].set_title('Query STZ (diabetic)')
 plt.subplots_adjust(left=None, bottom=None, right=None, top=None, 
@@ -426,21 +433,19 @@ terms_plot=['BETA_CELLS','ENTEROENDOCRINE_CELLS']
 for term in terms_plot:
     adata_beta.obs[term]=adata_beta.obsm[
         'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='PANGLAO_'+term)[0][0]]
-np.random.seed(0)
-random_indices=np.random.permutation(list(range(adata_beta.shape[0])))
 fig,ax=plt.subplots(2,2,figsize=(12,8),sharey=True,sharex=True)
-sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',groups='ref',ax=ax[0,0],show=False) 
 ax[0,0].set_title('Reference')
-sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',
               groups=[group for group in adata_beta.obs.ref_querySample.cat.categories
                       if group!='ref'], ax=ax[0,1],show=False)
 ax[0,1].set_title('Query')
-sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',groups='control',ax=ax[1,0],show=False) 
 ax[1,0].set_title('Query healthy')
-sc.pl.scatter(adata_beta[random_indices,:], x=terms_plot[0], y=terms_plot[1], 
+sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',groups='STZ',ax=ax[1,1],show=False)
 ax[1,1].set_title('Query STZ (diabetic)')
 plt.subplots_adjust(left=None, bottom=None, right=None, top=None, 
@@ -557,7 +562,7 @@ for ct in scores:
     pd.options.display.max_rows=max_rows
 
 # %% [markdown]
-# There seem to be differences in: energy metabolism and protein synthesis, unfolded protein response, cell-matrix interactions and cell-cell (including immune communication).
+# There seem to be differences in: energy metabolism and protein synthesis, unfolded protein response, cell-matrix interactions and cell-cell (including immune) communication.
 
 # %%
 # Differential terms for plotting below
@@ -625,6 +630,190 @@ a=sns.catplot(x="score", y="ref_querySample",
             height=4, aspect=0.7, sharex=False,
             palette=[colormap[c] for c in swarmplot_df['ref_querySample'].cat.categories])
 plt.savefig(path_fig+'diabetes_reactomeEnrichment.pdf',dpi=300,bbox_inches='tight')
+
+# %% [markdown]
+# The term about immune interactions between lymphoid and non-limphoid cells shows bimodal distribution - something that could not have been identified if we did not had per-cell scores obtained from expiMap Thus we also plot how the distributions look in other reference samples to identify which scores located in similar regions.
+
+# %%
+# Term distributions across samples
+term= 'IMMUNOREGULATORY_INTERACTIONS_BETWEEN_A_LYMPHOID_AND_A_NON_LYMPHOID_CELL'
+# Unused palette study+query samples
+#cmap_study=dict(zip(adata_beta.obs['study'].cat.categories,adata_beta.uns['study_colors']))
+#cmap_samples_q=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
+#                        adata_beta.uns['ref_querySample_colors']))
+#palette=[]
+#for sample in adata_beta.obs['study_design'].cat.categories:
+#    rq=adata_beta[adata_beta.obs['study_design']==sample].obs.ref_query.values[0]
+#    if rq=='ref':
+#        study=adata_beta[adata_beta.obs['study_design']==sample].obs.study.values[0]
+#        palette.append(cmap_study[study])
+#    else:
+#        sample=adata_beta[adata_beta.obs['study_design']==sample].obs.ref_querySample.values[0]
+#        palette.append(cmap_samples_q[sample])
+a=sns.violinplot(
+        x=pd.Series(
+            adata_beta.obsm['X_qtr_directed'][:, 
+            np.argwhere(adata_beta.uns['terms']=='REACTOME_'+term)[0][0]],
+            name=term,index=adata_beta.obs_names), 
+            y=adata_beta.obs["study_design"],
+            sym='',inner=None,
+            palette=[cmap[adata_beta.obs.query('study_design==@study_design')['study'].values[0]] 
+                for study_design in adata_beta.obs['study_design'].cat.categories]
+)
+plt.savefig(path_fig+'samples_ImmunoregulatoryTerm.pdf',dpi=300,bbox_inches='tight')
+
+# %% [markdown]
+# #### Comparison of terms
+# Comparing different terms can give us additional insights into term relationships and their usability for separating cell populations.
+
+# %% [markdown]
+# Unfolded protein response is one of the hallmarks of type 2 diabetes. It arises due to increase in insulin production that exceeds the protein processing capacity of the beta cells. Thus we here compare activity distribution of differentially active gene set terms associated with protein metabolism. This includes terms related to translation and protein folding, processing, and secretion.
+
+# %%
+# Plot terms comparison in beta cells
+terms2=[
+    'METABOLISM_OF_MRNA',
+    'TRANSLATION',
+    'PROTEIN_FOLDING',
+    'MEMBRANE_TRAFFICKING',
+    'ASPARAGINE_N_LINKED_GLYCOSYLATION',
+]
+t1='UNFOLDED_PROTEIN_RESPONSE'
+# Randomise plotting order
+np.random.seed(0)
+# Sort random indices for ref to be on the bottom
+indices=np.array(range(adata_beta.shape[0]))
+random_indices=list(np.random.permutation(indices[adata_beta.obs.ref_query=='ref']))+\
+                list(np.random.permutation(indices[adata_beta.obs.ref_query=='query']))
+fig,axs=plt.subplots(1,len(terms2),figsize=(len(terms2)*4+2,4),sharey=False,sharex=True)
+for idx,t2 in enumerate(terms2):
+    terms_plot=[t1,t2]
+    for term in terms_plot:
+        adata_beta.obs[term]=adata_beta.obsm[
+        'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='REACTOME_'+term)[0][0]]
+    ax=axs[idx]
+    sns.scatterplot(x=adata_beta[random_indices,:].obs[terms_plot[0]],
+                y=adata_beta[random_indices,:].obs[terms_plot[1]],
+                hue=adata_beta[random_indices,:].obs['ref_querySample'],
+                palette=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
+                 adata_beta.uns['ref_querySample_colors'])),
+                s=0.5,rasterized=True,ax=ax)
+    if idx!=len(terms2)-1:
+        ax.get_legend().remove()
+    else:
+        ax.legend(bbox_to_anchor=(1.1, 1.05),frameon=False)
+        ax.get_legend().get_frame().set_facecolor('none')
+    adata_beta.obs.drop(terms_plot,axis=1,inplace=True)
+fig.tight_layout()
+plt.savefig(path_fig+'UPR_term_comparison.pdf',dpi=300,bbox_inches='tight')
+
+
+# %% [markdown]
+# It seems that some terms differentially active between healthy and STZ-treated query cells do not separate non-T2D diabetic reference cells from STZ treated query cells. ExpiMap thus better allows us to select T2D-specific gene sets as it enables direct comparison to the reference by using the batch-corrected latent space. Below we further check in which reference samples we observe increased mRNA metabolism without UPR response.
+#
+# Furthermore, we observe high correlation between UPR and asparagine N-linked glycosylation across all samples. This is an interesting finding as N-linked glycosylation changes were previously observed in diabetes, but it is not well known why they arise. As N-linked glycosylation may be associated with changes in cell communication we also plot the comparison between differentially active cell communication terms and asparagine N-linked glycosylation scores.
+
+# %% [markdown]
+# Comparison to asparagine N-linked glycosylation:
+
+# %%
+# Plot terms comparison in beta cells
+terms2=[
+    'NEUROTRANSMITTER_RECEPTOR_BINDING_AND_DOWNSTREAM_TRANSMISSION_IN_THE_POSTSYNAPTIC_CELL',
+    'INTEGRIN_CELL_SURFACE_INTERACTIONS',
+    'IMMUNOREGULATORY_INTERACTIONS_BETWEEN_A_LYMPHOID_AND_A_NON_LYMPHOID_CELL',
+    'GLYCEROPHOSPHOLIPID_BIOSYNTHESIS',
+    'PHOSPHOLIPID_METABOLISM',
+    'INNATE_IMMUNE_SYSTEM',
+    'L1CAM_INTERACTIONS',
+    'COLLAGEN_FORMATION',
+    'CHONDROITIN_SULFATE_DERMATAN_SULFATE_METABOLISM'
+]
+t1='ASPARAGINE_N_LINKED_GLYCOSYLATION'
+np.random.seed(0)
+# Sort random indices for ref to be on the bottom
+indices=np.array(range(adata_beta.shape[0]))
+random_indices=list(np.random.permutation(indices[adata_beta.obs.ref_query=='ref']))+\
+                list(np.random.permutation(indices[adata_beta.obs.ref_query=='query']))
+fig,axs=plt.subplots(1,len(terms2),figsize=(len(terms2)*4+6,4),sharey=False,sharex=True)
+for idx,t2 in enumerate(terms2):
+    terms_plot=[t1,t2]
+    for term in terms_plot:
+        adata_beta.obs[term]=adata_beta.obsm[
+        'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='REACTOME_'+term)[0][0]]
+    ax=axs[idx]
+    sns.scatterplot(x=adata_beta[random_indices,:].obs[terms_plot[0]],
+                y=adata_beta[random_indices,:].obs[terms_plot[1]],
+                hue=adata_beta[random_indices,:].obs['ref_querySample'],
+                palette=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
+                 adata_beta.uns['ref_querySample_colors'])),
+                s=0.5,rasterized=True,ax=ax)
+    if idx!=len(terms2)-1:
+        ax.get_legend().remove()
+    else:
+        ax.legend(bbox_to_anchor=(1.1, 1.05),frameon=False)
+        ax.get_legend().get_frame().set_facecolor('none')
+    adata_beta.obs.drop(terms_plot,axis=1,inplace=True)
+fig.tight_layout()
+plt.subplots_adjust(left=None, bottom=None, right=None, top=None, 
+                    wspace=0.3)
+plt.savefig(path_fig+'NGly_term_comparison.pdf',dpi=300,bbox_inches='tight')
+
+# %% [markdown]
+# Make subplot only of innate immune response and asparagine N-glycosylation comparison.
+
+# %%
+# Plot terms comparison in beta cells
+t2= 'INNATE_IMMUNE_SYSTEM'
+t1='ASPARAGINE_N_LINKED_GLYCOSYLATION'
+np.random.seed(0)
+# Sort random indices for ref to be on the bottom
+indices=np.array(range(adata_beta.shape[0]))
+random_indices=list(np.random.permutation(indices[adata_beta.obs.ref_query=='ref']))+\
+                list(np.random.permutation(indices[adata_beta.obs.ref_query=='query']))
+fig,ax=plt.subplots(1,1,figsize=(4,4),sharey=False,sharex=True)
+
+terms_plot=[t1,t2]
+for term in terms_plot:
+    adata_beta.obs[term]=adata_beta.obsm[
+    'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='REACTOME_'+term)[0][0]]
+sns.scatterplot(x=adata_beta[random_indices,:].obs[terms_plot[0]],
+            y=adata_beta[random_indices,:].obs[terms_plot[1]],
+            hue=adata_beta[random_indices,:].obs['ref_querySample'],
+            palette=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
+             adata_beta.uns['ref_querySample_colors'])),
+            s=0.5,rasterized=True,ax=ax)
+ax.legend(bbox_to_anchor=(1.1, 1.05),frameon=False)
+ax.get_legend().get_frame().set_facecolor('none')
+adata_beta.obs.drop(terms_plot,axis=1,inplace=True)
+fig.tight_layout()
+plt.savefig(path_fig+'NGly_innateImmune_comparison.pdf',dpi=300,bbox_inches='tight')
+
+# %% [markdown]
+# Distribution of different terms differentially active in T2D model across all samples (including reference).
+
+# %%
+# Distribution of selected terms across all samples on beta cells
+terms=['METABOLISM_OF_MRNA','UNFOLDED_PROTEIN_RESPONSE',
+             'ASPARAGINE_N_LINKED_GLYCOSYLATION']
+fig,ax=plt.subplots(1,len(terms),figsize=(5*len(terms),10),sharey=True)
+for idx,term in enumerate(terms):
+    cmap=dict(zip(adata_beta.obs['study'].cat.categories,adata_beta.uns['study_colors']))
+    a=sns.boxplot(
+        x=pd.Series(
+            adata_beta.obsm['X_qtr_directed'][:, 
+            np.argwhere(adata_beta.uns['terms']=='REACTOME_'+term)[0][0]],
+            name=term,index=adata_beta.obs_names), 
+            y=adata_beta.obs["study_design"],
+            sym='',
+            palette=[cmap[adata_beta.obs.query('study_design==@study_design')['study'].values[0]] 
+                for study_design in adata_beta.obs['study_design'].cat.categories],ax=ax[idx])
+    if idx!=0:
+        ax[idx].set_ylabel('')
+plt.savefig(path_fig+'samples_UprRelatedReactomeTerms.pdf',dpi=300,bbox_inches='tight')
+
+# %% [markdown]
+# Increased mRNA metabolism without proportionally increased UPR response is observed in some young NOD samples and samples treated with FoxO and arthemeter. All these conditions may be related to beta cell stress, but seemingly not through UPR.
 
 # %% [markdown]
 # #### Correlation of enriched terms
