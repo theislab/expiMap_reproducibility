@@ -15,7 +15,7 @@ options(stringsAsFactors = FALSE)
 
 ad <- import("anndata", convert = FALSE)
 pd <- import("pandas", convert = FALSE)
-ad_object <- ad$read_h5ad("/Volumes/TIGERII/nobackup/CTRL_anotated.h5ad")
+ad_object <- ad$read_h5ad("/Volumes/TIGERII/nobackup/P1D5_anotated.h5ad")
 
 ### Access expression matrix
 
