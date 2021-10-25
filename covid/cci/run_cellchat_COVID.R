@@ -15,7 +15,7 @@ options(stringsAsFactors = FALSE)
 
 ad <- import("anndata", convert = FALSE)
 pd <- import("pandas", convert = FALSE)
-ad_object <- ad$read_h5ad("/Volumes/Bf110/ct5/experiments/objects/kang_covid_mo/P1D1_anotated.h5ad")
+ad_object <- ad$read_h5ad("/Volumes/TIGERII/nobackup/CTRL_anotated.h5ad")
 
 ### Access expression matrix
 
@@ -35,7 +35,7 @@ data.input <- normalizeData(data.input, scale.factor = 10000, do.log = TRUE)
 
 ### Create `cellchat` object
 
-cellchat <- createCellChat(object = data.input, meta = meta, group.by = "cell_type_joint")
+cellchat <- createCellChat(object = data.input, meta = meta, group.by = "celltype")
 
 ### Set up ligand-receptor interaction database for `cellchat`
 
