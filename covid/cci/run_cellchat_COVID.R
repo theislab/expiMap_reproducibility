@@ -15,7 +15,7 @@ options(stringsAsFactors = FALSE)
 
 ad <- import("anndata", convert = FALSE)
 pd <- import("pandas", convert = FALSE)
-ad_object <- ad$read_h5ad("/Volumes/TIGERII/nobackup/P2D5_anotated.h5ad")
+ad_object <- ad$read_h5ad("/Volumes/TIGERII/nobackup/P2D7_anotated.h5ad")
 
 ### Access expression matrix
 
@@ -90,7 +90,8 @@ for (i in 1:nrow(mat)) {
 unique(df.net$pathway_name)
 
 options(repr.plot.width = 10, repr.plot.height = 15)
-pathways.show <- c("ANNEXIN") 
+pathways.show <- c("ANNEXIN")
+#pathways.show <- c("CXCL")
 netAnalysis_contribution(cellchat, signaling = pathways.show)
 vertex.receiver = seq(1,4) # a numeric vector. 
 netVisual_aggregate(cellchat, signaling = pathways.show,  vertex.receiver = vertex.receiver)
