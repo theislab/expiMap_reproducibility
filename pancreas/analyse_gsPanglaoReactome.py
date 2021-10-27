@@ -721,11 +721,8 @@ plt.savefig(path_fig+'UPR_term_comparison.pdf',dpi=300,bbox_inches='tight')
 terms2=[
     'NEUROTRANSMITTER_RECEPTOR_BINDING_AND_DOWNSTREAM_TRANSMISSION_IN_THE_POSTSYNAPTIC_CELL',
     'INTEGRIN_CELL_SURFACE_INTERACTIONS',
-    'IMMUNOREGULATORY_INTERACTIONS_BETWEEN_A_LYMPHOID_AND_A_NON_LYMPHOID_CELL',
     'GLYCEROPHOSPHOLIPID_BIOSYNTHESIS',
     'PHOSPHOLIPID_METABOLISM',
-    'INNATE_IMMUNE_SYSTEM',
-    'L1CAM_INTERACTIONS',
     'COLLAGEN_FORMATION',
     'CHONDROITIN_SULFATE_DERMATAN_SULFATE_METABOLISM'
 ]
@@ -757,7 +754,44 @@ for idx,t2 in enumerate(terms2):
 fig.tight_layout()
 plt.subplots_adjust(left=None, bottom=None, right=None, top=None, 
                     wspace=0.3)
-plt.savefig(path_fig+'NGly_term_comparison.pdf',dpi=300,bbox_inches='tight')
+plt.savefig(path_fig+'NGly_communication_comparison.pdf',dpi=300,bbox_inches='tight')
+
+# %%
+# Plot terms comparison in beta cells
+terms2=[
+    'IMMUNOREGULATORY_INTERACTIONS_BETWEEN_A_LYMPHOID_AND_A_NON_LYMPHOID_CELL',
+    'INNATE_IMMUNE_SYSTEM',
+    'L1CAM_INTERACTIONS',
+]
+t1='ASPARAGINE_N_LINKED_GLYCOSYLATION'
+np.random.seed(0)
+# Sort random indices for ref to be on the bottom
+indices=np.array(range(adata_beta.shape[0]))
+random_indices=list(np.random.permutation(indices[adata_beta.obs.ref_query=='ref']))+\
+                list(np.random.permutation(indices[adata_beta.obs.ref_query=='query']))
+fig,axs=plt.subplots(1,len(terms2),figsize=(len(terms2)*4+4,4),sharey=False,sharex=True)
+for idx,t2 in enumerate(terms2):
+    terms_plot=[t1,t2]
+    for term in terms_plot:
+        adata_beta.obs[term]=adata_beta.obsm[
+        'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='REACTOME_'+term)[0][0]]
+    ax=axs[idx]
+    sns.scatterplot(x=adata_beta[random_indices,:].obs[terms_plot[0]],
+                y=adata_beta[random_indices,:].obs[terms_plot[1]],
+                hue=adata_beta[random_indices,:].obs['ref_querySample'],
+                palette=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
+                 adata_beta.uns['ref_querySample_colors'])),
+                s=0.5,rasterized=True,ax=ax)
+    if idx!=len(terms2)-1:
+        ax.get_legend().remove()
+    else:
+        ax.legend(bbox_to_anchor=(1.1, 1.05),frameon=False)
+        ax.get_legend().get_frame().set_facecolor('none')
+    adata_beta.obs.drop(terms_plot,axis=1,inplace=True)
+fig.tight_layout()
+plt.subplots_adjust(left=None, bottom=None, right=None, top=None, 
+                    wspace=0.3)
+plt.savefig(path_fig+'NGly_immune_comparison.pdf',dpi=300,bbox_inches='tight')
 
 # %% [markdown]
 # Make subplot only of innate immune response and asparagine N-glycosylation comparison.
