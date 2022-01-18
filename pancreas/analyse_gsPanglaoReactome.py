@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import seaborn as sns
 from pathlib import Path
+from matplotlib.patches import Patch
 
 from sklearn.metrics import f1_score
 
@@ -375,7 +376,7 @@ adata_beta.obs['study_design']=adata_beta.obs['study_design'].astype('category')
 colormap={'STZ':'cyan',
           'STZ_GLP-1':'tab:purple','STZ_estrogen':'tab:pink','STZ_GLP-1_estrogen':'pink',
          'STZ_insulin':'orange','STZ_GLP-1_estrogen+insulin':'gold',
-         'control':'yellowgreen', 'ref':'k'}
+         'control':'yellowgreen', 'ref':'#bfbfbf'}
 adata_beta.uns['ref_querySample_colors']=[
     colormap[cat] for cat in adata_beta.obs['ref_querySample'].cat.categories]
 study_colors_map={'Fltp_P16':'#D81B60','NOD':'#1E88E5',
@@ -407,8 +408,11 @@ for term in terms_plot:
     adata_beta.obs[term]=adata_beta.obsm[
         'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='PANGLAO_'+term)[0][0]]
 fig,ax=plt.subplots(2,2,figsize=(12,8),sharey=True,sharex=True)
+# Temporarily change p
 sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
-              color='ref_querySample',groups='ref',ax=ax[0,0],show=False) 
+              color='ref_querySample',groups='ref',ax=ax[0,0],show=False,
+             palette=[c if c!='#bfbfbf' else 'k' 
+                      for c in adata_beta.uns['ref_querySample_colors']]) 
 ax[0,0].set_title('Reference')
 sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',
@@ -435,7 +439,9 @@ for term in terms_plot:
         'X_qtr_directed'][:, np.argwhere(adata_beta.uns['terms']=='PANGLAO_'+term)[0][0]]
 fig,ax=plt.subplots(2,2,figsize=(12,8),sharey=True,sharex=True)
 sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
-              color='ref_querySample',groups='ref',ax=ax[0,0],show=False) 
+              color='ref_querySample',groups='ref',ax=ax[0,0],show=False,
+             palette=[c if c!='#bfbfbf' else 'k' 
+                      for c in adata_beta.uns['ref_querySample_colors']]) 
 ax[0,0].set_title('Reference')
 sc.pl.scatter(adata_beta, x=terms_plot[0], y=terms_plot[1], 
               color='ref_querySample',
@@ -525,7 +531,23 @@ sc.pl.umap(adata_beta[random_indices,:],color='ref_querySample',s=10,
           save='_betaCells.pdf')
 
 # %% [markdown]
-# Healthy reference cells (named control) map mainly with reference cells (which are not T2 diabetic). Cells treated with STZ (T2 diabetes model) map largely to a different location.
+# Healthy reference cells (named control) map mainly with reference cells (which are not T2 diabetic). Cells treated with STZ (T2 diabetes model) map largely to a different location. To support this observation from UMAP embedding we also compute PAGA of query samples and reference to more quantitatively asses the sample similarities.
+
+# %%
+# Compute PAGA
+sc.tl.paga(adata_beta,groups='ref_querySample')
+
+# %%
+# Plot PAGA
+fig,ax=plt.subplots(figsize=(3,3))
+sc.pl.paga(adata_beta, color='ref_querySample',ax=ax,
+           labels=['']*adata_beta.obs['ref_querySample'].nunique(),
+           edge_width_scale=0.5, node_size_scale=0.3,fontsize=3,show=False,
+          frameon=False)
+handles = [Patch(facecolor=c) for c in adata_beta.uns['ref_querySample_colors']]
+ax.legend(handles, adata_beta.obs['ref_querySample'].cat.categories,
+           bbox_to_anchor=(1, 0.935), bbox_transform=plt.gcf().transFigure, frameon=False)
+plt.savefig(path_fig+'betaCells_paga.pdf',dpi=300,bbox_inches='tight')
 
 # %% [markdown]
 # ### Differential gene-set scores
@@ -567,6 +589,33 @@ for ct in scores:
 # %%
 # Differential terms for plotting below
 plot_terms=data_enr.index
+
+# %% [markdown]
+# We can extract genes that contribute the most to the activation of each term.
+
+# %%
+# Report genes contributing to each enriched term
+weight_datas={}
+term_id=dict(zip(plot_terms,range(len(plot_terms))))
+for term in term_id.keys():
+    term_idx=np.argwhere(adata.uns['terms']=='REACTOME_'+term)[0,0]
+    # Only non-zero weight genes are reported
+    weights=pd.DataFrame({
+        'EID':adata.var_names.values,
+        'gene_symbol':adata.var.gene_symbol.values,
+        'weight':model.model.decoder.L0.expr_L.weight[:,term_idx].detach().numpy()})
+    weights=weights.query('weight!=0')
+    weights.sort_values('weight',key=abs,inplace=True,ascending=False)
+    weight_datas[term]=weights
+# Save non-zero weight genes of each term
+writer = pd.ExcelWriter(path_res+'diabetes_reactomeEnriched_geneWeights.xlsx',
+                        engine='xlsxwriter') 
+for term,data in weight_datas.items():
+    data.to_excel(writer, sheet_name=str(term_id[term]),index=False) 
+# Save sheet name-term mapping
+pd.DataFrame({'term':term_id.keys(),'sheet_name':term_id.values()}
+            ).to_excel(writer, sheet_name='Sheet name terms',index=False) 
+writer.save()
 
 # %% [markdown]
 # #### Enriched gene set overlap
@@ -698,6 +747,9 @@ for idx,t2 in enumerate(terms2):
                 palette=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
                  adata_beta.uns['ref_querySample_colors'])),
                 s=0.5,rasterized=True,ax=ax)
+    corr=np.corrcoef(adata_beta.obs[terms_plot[0]].values.ravel(),
+                     adata_beta.obs[terms_plot[1]].values.ravel())[0,1]
+    ax.set_title('Correlation: %.2f'%corr)
     if idx!=len(terms2)-1:
         ax.get_legend().remove()
     else:
@@ -706,7 +758,6 @@ for idx,t2 in enumerate(terms2):
     adata_beta.obs.drop(terms_plot,axis=1,inplace=True)
 fig.tight_layout()
 plt.savefig(path_fig+'UPR_term_comparison.pdf',dpi=300,bbox_inches='tight')
-
 
 # %% [markdown]
 # It seems that some terms differentially active between healthy and STZ-treated query cells do not separate non-T2D diabetic reference cells from STZ treated query cells. ExpiMap thus better allows us to select T2D-specific gene sets as it enables direct comparison to the reference by using the batch-corrected latent space. Below we further check in which reference samples we observe increased mRNA metabolism without UPR response.
@@ -745,6 +796,9 @@ for idx,t2 in enumerate(terms2):
                 palette=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
                  adata_beta.uns['ref_querySample_colors'])),
                 s=0.5,rasterized=True,ax=ax)
+    corr=np.corrcoef(adata_beta.obs[terms_plot[0]].values.ravel(),
+                     adata_beta.obs[terms_plot[1]].values.ravel())[0,1]
+    ax.set_title('Correlation: %.2f'%corr)
     if idx!=len(terms2)-1:
         ax.get_legend().remove()
     else:
@@ -782,6 +836,9 @@ for idx,t2 in enumerate(terms2):
                 palette=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
                  adata_beta.uns['ref_querySample_colors'])),
                 s=0.5,rasterized=True,ax=ax)
+    corr=np.corrcoef(adata_beta.obs[terms_plot[0]].values.ravel(),
+                     adata_beta.obs[terms_plot[1]].values.ravel())[0,1]
+    ax.set_title('Correlation: %.2f'%corr)
     if idx!=len(terms2)-1:
         ax.get_legend().remove()
     else:
@@ -817,6 +874,9 @@ sns.scatterplot(x=adata_beta[random_indices,:].obs[terms_plot[0]],
             palette=dict(zip(adata_beta.obs['ref_querySample'].cat.categories,
              adata_beta.uns['ref_querySample_colors'])),
             s=0.5,rasterized=True,ax=ax)
+corr=np.corrcoef(adata_beta.obs[terms_plot[0]].values.ravel(),
+                     adata_beta.obs[terms_plot[1]].values.ravel())[0,1]
+ax.set_title('Correlation: %.2f'%corr)
 ax.legend(bbox_to_anchor=(1.1, 1.05),frameon=False)
 ax.get_legend().get_frame().set_facecolor('none')
 adata_beta.obs.drop(terms_plot,axis=1,inplace=True)
