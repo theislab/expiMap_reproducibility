@@ -16,7 +16,7 @@ print(adata_file, batch_col)
 
 adata = sc.read(adata_file)
 
-scvi.data.setup_anndata(adata, batch_key=batch_col)
+scvi.model.SCVI.setup_anndata(adata, batch_key=batch_col, layer='counts')
 
 vae = scvi.model.SCVI(adata)
 vae.train(max_epochs=500, early_stopping=True)
