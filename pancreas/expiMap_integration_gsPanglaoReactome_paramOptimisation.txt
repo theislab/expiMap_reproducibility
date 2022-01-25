@@ -1,0 +1,11 @@
+# First switch to correct branch
+echo "Switching git branch"
+cd $WSC/scarches
+git stash
+branch=$(git symbolic-ref --short HEAD)
+git checkout sergey
+git branch
+
+# Train and save model 
+params="-d mo/ -a 0,1 -akl 0.1 -aklq 0.1 -ra 0 -uh 0 -b study_sample -sd 0 -ne 500 -s 1 -mig 3 -mg 200 -hls 830,830,830 -dll softplus -aea 100 -wd 0"
+sbatch /storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/pancreas/expiMap_integration_gsPanglaoReactome_paramOptimisation.sbatch "$params"
