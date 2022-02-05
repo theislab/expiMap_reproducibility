@@ -11,3 +11,6 @@ https://drive.google.com/file/d/1WhmpTHoDXLyq4sOc6viRDEuCZ8Nz2q86/view?usp=shari
 
 Code to run  
 https://github.com/theislab/scarches/tree/soft_new_mask
+
+For the new api use  
+https://github.com/theislab/scarches
