@@ -28,6 +28,7 @@ import matplotlib
 import seaborn as sns
 from pathlib import Path
 from matplotlib.patches import Patch
+import textwrap
 
 from sklearn.metrics import f1_score
 
@@ -44,6 +45,7 @@ import scripts.annotation_transfer_utils as atu
 path_gmt='/storage/groups/ml01/code/karin.hrovatin//qtr_intercode_reproducibility-/metadata/'
 path_data='/storage/groups/ml01/workspace/karin.hrovatin//data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ_rmNodElimination/'
 subdir='mo/'
+path_gs='/storage/groups/ml01/workspace/karin.hrovatin//data/pancreas/gene_lists/'
 params_name='a_p0.0r1.0-akl_0.1-aklq_0.1-ra_0-uh_0-b_study_sample-sd_False-dp_0.01-lr_0.001-hls_830.830.830-es_1-nh_10000-ne_500-dll_softplus-ule_False-mg_200-mig_3-aea_100-aeaq_None-wd_0.0'
 path_fig=path_data+subdir+'figures/'
 path_res=path_data+subdir+'results/'
@@ -287,6 +289,52 @@ sc.pl.umap(adata_latent_q,color=plot_terms,s=10,cmap='coolwarm',vcenter=0,
 
 # %% [markdown]
 # This helps us to identify some cell types that were not predicted, such as immune cells (absent from reference) and acinar cells (low number of cells).
+
+# %% [markdown]
+# Plot some B cell markers for comparison
+
+# %%
+# Query data with expression and embedding
+adata_q=adata[adata_latent_q.obs_names,:].copy()
+adata_q.obsm['X_umap']=adata_latent_q.obsm['X_umap'].copy()
+
+# %%
+# Plot some B cell markers specified by reviewer
+rcParams['figure.figsize']=(6,6)
+sc.pl.umap(adata_q,color=['Cd19', 'Ms4a1', 'Cd79a'],s=10, gene_symbols='gene_symbol',
+          save='_query_pancreas_Bcell_markersRev.pdf'
+          )
+
+# %% [markdown]
+# Find more B markers in Panglao
+
+# %%
+# Load panglao
+panglao=pd.read_table(path_gs+'PanglaoDB_markers_27_Mar_2020.tsv')
+
+# %%
+# Look at marker quality scores
+rcParams['figure.figsize']=(3,3)
+sns.scatterplot(x='sensitivity_mouse', y='specificity_mouse', 
+           data=panglao.query('`cell type`=="B cells"'),s=10)
+
+# %% [markdown]
+# Seems that markers from PanglaoDB are sensitive but not specific.
+
+# %%
+# Top markers from PanglaoDB
+panglao.query(
+               '`cell type`=="B cells" & sensitivity_mouse>0.5 & specificity_mouse>0.1')
+
+# %%
+# Plot top B cell markers from PanglaoDB
+rcParams['figure.figsize']=(6,6)
+sc.pl.umap(adata_q, color=['Ebf1','Cd74','Cd52'], s=10, gene_symbols='gene_symbol',
+          save='_query_pancreas_Bcell_markersPanglao.pdf'
+          )
+
+# %% [markdown]
+# For B cell annotation neither expert markers given by reviewer nor markers from PanglaoDB work as well as expiMap scores. - Both sets of markers lack sensitivity and PanglaoDB markers also lack specificty.
 
 # %% [markdown]
 # #### Cell type-term enrichment per cell cluster of query
@@ -937,3 +985,60 @@ g=sns.clustermap(term_correlation.astype('float'),cmap='coolwarm',vmin=-1,vmax=1
 
 # %% [markdown]
 # We do not see any clear separation of terms into different groups.
+
+# %% [markdown]
+# #### Correlation between selected term scores and thgeir genes
+
+# %%
+# Terms for which to calculate expression between genes and term score
+terms=[
+    'UNFOLDED_PROTEIN_RESPONSE',
+    'METABOLISM_OF_MRNA',
+    'TRANSLATION',
+    'PROTEIN_FOLDING',
+    'MEMBRANE_TRAFFICKING',
+    'ASPARAGINE_N_LINKED_GLYCOSYLATION',
+    'IMMUNOREGULATORY_INTERACTIONS_BETWEEN_A_LYMPHOID_AND_A_NON_LYMPHOID_CELL',
+    'INNATE_IMMUNE_SYSTEM',
+    'L1CAM_INTERACTIONS',
+]
+
+# %%
+datas=[]
+for term in terms:
+    term_idx=np.argwhere(adata_beta.uns['terms']=='REACTOME_'+term)[0,0]
+    # Gene weights of term genes
+    data=pd.DataFrame({
+        'EID':adata_beta.var_names.values,
+        'gene_symbol':adata_beta.var.gene_symbol.values,
+        'weight':model.model.decoder.L0.expr_L.weight[:,term_idx].detach().numpy(),
+    })
+    data.index=data.EID
+    genes_term=terms_genes['REACTOME_'+term]
+    data=data.loc[genes_term,:]
+    # Add term
+    data['term']=term
+    # Add gene-term corr and gene xpr info
+    data['correlation']=np.nan
+    data['expressed cells ratio']=np.nan
+    for i,eid in enumerate(genes_term):
+        expr=adata_beta[:,eid].X.ravel()
+        data.at[eid,'correlation']=np.corrcoef(
+            adata_beta.obsm['X_qtr_directed'][:,term_idx].ravel(),expr)[0,1]
+        data.at[eid,'expressed cells ratio']=(expr>0).sum()/expr.shape[0]
+    datas.append(data)
+datas=pd.concat(datas)
+
+# %%
+# Plot gene-term score corr compared to gene weight and expression
+g=sns.relplot(x='weight',y='correlation',col='term',data=datas,s=15,col_wrap=5,
+             hue='expressed cells ratio',facet_kws=dict(sharex=False))
+plt.subplots_adjust(hspace=0.2)
+for ax in g.axes:
+    ax.set_title("-\n".join(textwrap.wrap(
+        ax.get_title().replace('term = ',''),37)))
+    ax.axhline(0,c='navy',lw=0.5)
+    ax.axvline(0,c='navy',lw=0.5)
+plt.savefig(path_fig+'geneterm_corr.pdf',dpi=300,bbox_inches='tight')
+
+# %%
