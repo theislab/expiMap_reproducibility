@@ -35,17 +35,17 @@ from sklearn.metrics import f1_score
 from scarches.dataset.trvae.data_handling import remove_sparsity
 
 import sys
-sys.path.insert(0, '/storage/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/')
+sys.path.insert(0, '/lustre/groups/ml01/code/karin.hrovatin/qtr_intercode_reproducibility-/')
 import scripts.annotation_transfer_utils as atu
 import importlib
 importlib.reload(atu)
 import scripts.annotation_transfer_utils as atu
 
 # %%
-path_gmt='/storage/groups/ml01/code/karin.hrovatin//qtr_intercode_reproducibility-/metadata/'
-path_data='/storage/groups/ml01/workspace/karin.hrovatin//data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ_rmNodElimination/'
+path_gmt='/lustre/groups/ml01/code/karin.hrovatin//qtr_intercode_reproducibility-/metadata/'
+path_data='/lustre/groups/ml01/workspace/karin.hrovatin//data/pancreas/scRNA/qtr/integrated/gsCellType_query/querySTZ_rmNodElimination/'
 subdir='mo/'
-path_gs='/storage/groups/ml01/workspace/karin.hrovatin//data/pancreas/gene_lists/'
+path_gs='/lustre/groups/ml01/workspace/karin.hrovatin//data/pancreas/gene_lists/'
 params_name='a_p0.0r1.0-akl_0.1-aklq_0.1-ra_0-uh_0-b_study_sample-sd_False-dp_0.01-lr_0.001-hls_830.830.830-es_1-nh_10000-ne_500-dll_softplus-ule_False-mg_200-mig_3-aea_100-aeaq_None-wd_0.0'
 path_fig=path_data+subdir+'figures/'
 path_res=path_data+subdir+'results/'
@@ -291,7 +291,10 @@ sc.pl.umap(adata_latent_q,color=plot_terms,s=10,cmap='coolwarm',vcenter=0,
 # This helps us to identify some cell types that were not predicted, such as immune cells (absent from reference) and acinar cells (low number of cells).
 
 # %% [markdown]
-# Plot some B cell markers for comparison
+# ##### Immune cell specific analysis in query
+
+# %% [markdown]
+# Subset to immune cells and plot immune-specific scores and markers.
 
 # %%
 # Query data with expression and embedding
@@ -299,10 +302,57 @@ adata_q=adata[adata_latent_q.obs_names,:].copy()
 adata_q.obsm['X_umap']=adata_latent_q.obsm['X_umap'].copy()
 
 # %%
-# Plot some B cell markers specified by reviewer
-rcParams['figure.figsize']=(6,6)
-sc.pl.umap(adata_q,color=['Cd19', 'Ms4a1', 'Cd79a'],s=10, gene_symbols='gene_symbol',
-          save='_query_pancreas_Bcell_markersRev.pdf'
+# Subset to immune cells
+adata_q_immune=adata_q[adata_q.obs.cell_type.str.startswith('immune'),:].copy()
+
+# %%
+# Normalise expression
+if 'counts' not in adata_q_immune.layers:
+    adata_q_immune.layers['counts']=adata_q_immune.X
+sc.pp.normalize_total(adata_q_immune)
+sc.pp.log1p(adata_q_immune)
+
+# %%
+# Compute embedding of query on terms used for classification
+sc.pp.neighbors(adata_q_immune,use_rep='X_qtr_directed')
+sc.tl.umap(adata_q_immune)
+
+# %%
+# get latent query
+adata_latent_q_immune=adata_latent_q[adata_q_immune.obs_names,:].copy()
+adata_latent_q_immune.obsm['X_umap']=adata_q_immune.obsm['X_umap']
+
+# %%
+terms_immune={
+        'PANGLAO_T_CELLS':['Trbc2'],
+        'PANGLAO_B_CELLS':['Cd79a'],
+        'PANGLAO_MACROPHAGES':['C1qc'],
+        'PANGLAO_MONOCYTES':['Psap'],
+        "PANGLAO_NEUTROPHILS":['Csf3r'],
+        'PANGLAO_DENDRITIC_CELLS':['S100a6'],}
+
+# %%
+# Plot immune scores
+plot_terms=list(terms_ct.keys())
+rcParams['figure.figsize']=(3,3)
+# Set colormap values for plotting, no min/max
+sc.pl.umap(adata_latent_q_immune,color=list(terms_immune.keys()),
+           s=50,cmap='coolwarm',vcenter=0,wspace=0.3,
+           save='_queryImmune_immuneCT_scores.pdf',
+           sort_order=False,
+           ncols=10
+          )
+
+# %%
+# Plot immune markers - one per above plotted score
+plot_terms=list(terms_ct.keys())
+rcParams['figure.figsize']=(3,3)
+# Set colormap values for plotting, no min/max
+sc.pl.umap(adata_q_immune,color=[v[0] for v in terms_immune.values()],
+           s=50,cmap='coolwarm',vcenter=0,gene_symbols='gene_symbol',wspace=0.3,
+           save='_queryImmune_immuneCT_markers.pdf',
+           sort_order=False,
+           ncols=10
           )
 
 # %% [markdown]
@@ -311,6 +361,11 @@ sc.pl.umap(adata_q,color=['Cd19', 'Ms4a1', 'Cd79a'],s=10, gene_symbols='gene_sym
 # %%
 # Load panglao
 panglao=pd.read_table(path_gs+'PanglaoDB_markers_27_Mar_2020.tsv')
+
+# %%
+# N B cell markers in PanglaoDB
+print('N B cell markers in PanglaoDB:', 
+      len(set(panglao.query('`cell type`=="B cells"')['official gene symbol'])))
 
 # %%
 # Look at marker quality scores
@@ -327,14 +382,19 @@ panglao.query(
                '`cell type`=="B cells" & sensitivity_mouse>0.5 & specificity_mouse>0.1')
 
 # %%
-# Plot top B cell markers from PanglaoDB
-rcParams['figure.figsize']=(6,6)
-sc.pl.umap(adata_q, color=['Ebf1','Cd74','Cd52'], s=10, gene_symbols='gene_symbol',
-          save='_query_pancreas_Bcell_markersPanglao.pdf'
+# Plot expert and Panglao B cell markers
+plot_terms=list(terms_ct.keys())
+rcParams['figure.figsize']=(3,3)
+# Set colormap values for plotting, no min/max
+sc.pl.umap(adata_q_immune,color=['Cd19', 'Ms4a1', 'Jchain','Ebf1','Cd74','Cd52'],
+           s=50,cmap='coolwarm',vcenter=0,gene_symbols='gene_symbol',wspace=0.3,
+           save='_queryImmune_immuneCT_Bmarkers.pdf',
+           sort_order=False,
+           ncols=10
           )
 
 # %% [markdown]
-# For B cell annotation neither expert markers given by reviewer nor markers from PanglaoDB work as well as expiMap scores. - Both sets of markers lack sensitivity and PanglaoDB markers also lack specificty.
+# For B cell annotation neither expert markers given by reviewer nor markers from PanglaoDB work as well as expiMap scores. - Both sets of markers lack sensitivity (potentially due to dropout) and PanglaoDB markers also lack specificty.
 
 # %% [markdown]
 # #### Cell type-term enrichment per cell cluster of query
@@ -987,7 +1047,7 @@ g=sns.clustermap(term_correlation.astype('float'),cmap='coolwarm',vmin=-1,vmax=1
 # We do not see any clear separation of terms into different groups.
 
 # %% [markdown]
-# #### Correlation between selected term scores and thgeir genes
+# #### Correlation between selected term scores and their genes
 
 # %%
 # Terms for which to calculate expression between genes and term score
@@ -1002,6 +1062,13 @@ terms=[
     'INNATE_IMMUNE_SYSTEM',
     'L1CAM_INTERACTIONS',
 ]
+
+# %%
+# Normalise expression
+if 'counts' not in adata_beta.layers:
+    adata_beta.layers['counts']=adata_beta.X
+sc.pp.normalize_total(adata_beta)
+sc.pp.log1p(adata_beta)
 
 # %%
 datas=[]
@@ -1040,5 +1107,42 @@ for ax in g.axes:
     ax.axhline(0,c='navy',lw=0.5)
     ax.axvline(0,c='navy',lw=0.5)
 plt.savefig(path_fig+'geneterm_corr.pdf',dpi=300,bbox_inches='tight')
+
+# %% [markdown]
+# ##### Gene-level correlation between innate immune system and asparagine N-linked glysocylation terms
+# Since the correlation is negative, which is not expected, this could be due to discrepancy between gene and GP direction, as indicated by the negative correlation between genes and the innate immune system GP. 
+#
+# To speed up analysis use only N genes with max abs weight for each of the GPs.
+
+# %%
+# Correlation between genes with highest weights
+n_top=10
+gs1="ASPARAGINE_N_LINKED_GLYCOSYLATION"
+gs2="INNATE_IMMUNE_SYSTEM"
+genes1=datas.query('term==@gs1').sort_values('weight',key=abs).tail(n_top).EID
+genes2=datas.query('term==@gs2' ).sort_values('weight',key=abs).tail(n_top).EID
+corrs=pd.DataFrame(index=genes1,columns=genes2)
+for g1 in genes1:
+    for g2 in genes2:
+        corrs.at[g1,g2]=np.corrcoef(
+            adata_beta[:,g1].X.ravel(),adata_beta[:,g2].X.ravel())[0,1]
+        # Name colls for plot
+corrs.index.name=gs1
+corrs.columns.name=gs2
+
+# %%
+# Plot correlation between individual genes
+sns.clustermap(corrs.astype(float),cmap='coolwarm',vmin=-1,vmax=1,
+               xticklabels=True,yticklabels=True,figsize=(6,6))
+plt.savefig(path_fig+'topGeneCorr_innImm_AspNGly_heatmap.pdf',dpi=300,bbox_inches='tight')
+
+# %%
+# Plot cortrelation across all genes
+rcParams['figure.figsize']=(4,2)
+plt.hist(corrs.values.ravel(),bins=100)
+plt.xlabel('correlation')
+plt.ylabel("N gene pairs")
+plt.grid(b=None)
+plt.savefig(path_fig+'topGeneCorr_innImm_AspNGly.pdf',dpi=300,bbox_inches='tight')
 
 # %%
