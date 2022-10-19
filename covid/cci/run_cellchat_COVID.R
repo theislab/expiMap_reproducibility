@@ -29,10 +29,6 @@ colnames(data.input) <- rownames(py_to_r(ad_object$obs))
 meta.data <- py_to_r(ad_object$obs)
 meta <- meta.data
 
-### Normalise data 
-
-data.input <- normalizeData(data.input, scale.factor = 10000, do.log = TRUE)
-
 ### Create `cellchat` object
 
 cellchat <- createCellChat(object = data.input, meta = meta, group.by = "celltype")
