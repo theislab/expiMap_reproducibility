@@ -48,6 +48,7 @@ subdir='mo/'
 path_gs='/lustre/groups/ml01/workspace/karin.hrovatin//data/pancreas/gene_lists/'
 params_name='a_p0.0r1.0-akl_0.1-aklq_0.1-ra_0-uh_0-b_study_sample-sd_False-dp_0.01-lr_0.001-hls_830.830.830-es_1-nh_10000-ne_500-dll_softplus-ule_False-mg_200-mig_3-aea_100-aeaq_None-wd_0.0'
 path_fig=path_data+subdir+'figures/'
+path_fig_data=path_fig+'data/'
 path_res=path_data+subdir+'results/'
 
 # %%
@@ -290,6 +291,15 @@ sc.pl.umap(adata_latent_q,color=plot_terms,s=10,cmap='coolwarm',vcenter=0,
 # %% [markdown]
 # This helps us to identify some cell types that were not predicted, such as immune cells (absent from reference) and acinar cells (low number of cells).
 
+# %%
+# Save data of query embedding
+pd.concat([
+    pd.DataFrame(adata_latent_q.obsm['X_umap'], 
+             index = adata_latent_q.obs_names, columns=['UMAP1','UMAP2']),
+    adata_latent_q.obs[["evaluation",'uncertainty','cell_type','pred_cell_type']],
+    adata_latent_q[:,plot_terms].to_df(),
+],axis=1).to_csv(path_fig_data+'latent_query_annoTransfer.tsv',sep='\t')
+
 # %% [markdown]
 # ##### Immune cell specific analysis in query
 
@@ -395,6 +405,18 @@ sc.pl.umap(adata_q_immune,color=['Cd19', 'Ms4a1', 'Jchain','Ebf1','Cd74','Cd52']
 
 # %% [markdown]
 # For B cell annotation neither expert markers given by reviewer nor markers from PanglaoDB work as well as expiMap scores. - Both sets of markers lack sensitivity (potentially due to dropout) and PanglaoDB markers also lack specificty.
+
+# %%
+# Save data of immune embedding
+gs_save=['Cd19', 'Ms4a1', 'Jchain','Ebf1','Cd74','Cd52']+\
+           [i for  ii in list(terms_immune.values()) for i in ii]
+eids_save=[adata_q_immune.var.query('gene_symbol==@gs').index[0] for gs in gs_save]
+pd.concat([
+    pd.DataFrame(adata_q_immune.obsm['X_umap'], 
+             index = adata_q_immune.obs_names, columns=['UMAP1','UMAP2']),
+    adata_q_immune[:,eids_save].to_df().rename(dict(zip(eids_save,gs_save)),axis=1),
+    adata_latent_q_immune[:,list(terms_immune.keys())].to_df(),
+],axis=1).to_csv(path_fig_data+'latent_query_immune.tsv',sep='\t')
 
 # %% [markdown]
 # #### Cell type-term enrichment per cell cluster of query
@@ -638,6 +660,14 @@ random_indices=np.random.permutation(list(range(adata_beta.shape[0])))
 sc.pl.umap(adata_beta[random_indices,:],color='ref_querySample',s=10,
           save='_betaCells.pdf')
 
+# %%
+# Save beta latent
+pd.concat([
+    pd.DataFrame(adata_beta.obsm['X_umap'],
+             index=adata_beta.obs_names,columns=['UMAP1','UMAP2']),
+    adata_beta.obs['ref_querySample']
+],axis=1).to_csv(path_fig_data+'latent_beta_samples.tsv',sep='\t')
+
 # %% [markdown]
 # Healthy reference cells (named control) map mainly with reference cells (which are not T2 diabetic). Cells treated with STZ (T2 diabetes model) map largely to a different location. To support this observation from UMAP embedding we also compute PAGA of query samples and reference to more quantitatively asses the sample similarities.
 
@@ -656,6 +686,11 @@ handles = [Patch(facecolor=c) for c in adata_beta.uns['ref_querySample_colors']]
 ax.legend(handles, adata_beta.obs['ref_querySample'].cat.categories,
            bbox_to_anchor=(1, 0.935), bbox_transform=plt.gcf().transFigure, frameon=False)
 plt.savefig(path_fig+'betaCells_paga.pdf',dpi=300,bbox_inches='tight')
+
+# %%
+paga=adata_beta.uns['paga'].copy()
+paga['group_values']=list(adata_beta.obs[adata_beta.uns['paga']['groups']].cat.categories)
+pickle.dump(paga,open(path_fig_data+'latent_beta_paga.pkl','wb'))
 
 # %% [markdown]
 # ### Differential gene-set scores
@@ -756,6 +791,10 @@ sns.clustermap(terms_genes_map,xticklabels=False,method='ward')
 
 # %% [markdown]
 # The enriched gene sets do not have many overlapping terms. This is likely due to using high regularisation parameter alpha in integration for Reactome terms, leading to deactivation of redundant gene-set terms.
+
+# %%
+# Save enriched gs gene memebership plot
+terms_genes_map.to_csv(path_fig_data+'betaT2D_enrichedGP_membership.tsv', sep='\t')
 
 # %% [markdown]
 # #### Distribution of term scores across conditions
@@ -1108,6 +1147,10 @@ for ax in g.axes:
     ax.axvline(0,c='navy',lw=0.5)
 plt.savefig(path_fig+'geneterm_corr.pdf',dpi=300,bbox_inches='tight')
 
+# %%
+# Save info on gene weights and correlation
+datas.to_csv(path_fig_data+'betaGP_genesCorrWeights.tsv',sep='\t')
+
 # %% [markdown]
 # ##### Gene-level correlation between innate immune system and asparagine N-linked glysocylation terms
 # Since the correlation is negative, which is not expected, this could be due to discrepancy between gene and GP direction, as indicated by the negative correlation between genes and the innate immune system GP. 
@@ -1144,5 +1187,34 @@ plt.xlabel('correlation')
 plt.ylabel("N gene pairs")
 plt.grid(b=None)
 plt.savefig(path_fig+'topGeneCorr_innImm_AspNGly.pdf',dpi=300,bbox_inches='tight')
+
+# %%
+# Save top gene correlations with GPs
+corrs.to_csv(path_fig_data+'betaGP_genesCorrTop.tsv',sep='\t')
+
+# %% [markdown]
+# #### Save plotted beta cell terms scores
+
+# %%
+terms_save=['PANGLAO_BETA_CELLS',
+            'PANGLAO_PANCREATIC_PROGENITOR_CELLS',
+            'PANGLAO_ENTEROENDOCRINE_CELLS',
+            'REACTOME_INNATE_IMMUNE_SYSTEM',
+            'REACTOME_IMMUNOREGULATORY_INTERACTIONS_BETWEEN_A_LYMPHOID_AND_A_NON_LYMPHOID_CELL',
+            'REACTOME_L1CAM_INTERACTIONS',
+            'REACTOME_ASPARAGINE_N_LINKED_GLYCOSYLATION',
+            'REACTOME_METABOLISM_OF_MRNA',
+            'REACTOME_TRANSLATION',
+            'REACTOME_PROTEIN_FOLDING',
+            'REACTOME_MEMBRANE_TRAFFICKING',
+            'REACTOME_UNFOLDED_PROTEIN_RESPONSE'
+           ]
+terms_save_idx=[np.argwhere(adata_beta.uns['terms']==t)[0][0] for t in terms_save]
+pd.concat([
+    pd.DataFrame(
+        adata_beta.obsm['X_qtr_directed'][:,terms_save_idx],
+        index=adata_beta.obs_names,columns=terms_save),
+    adata_beta.obs['ref_querySample']
+],axis=1).to_csv(path_fig_data+'beta_termsPlots.tsv',sep='\t')
 
 # %%
