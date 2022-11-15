@@ -692,6 +692,17 @@ paga=adata_beta.uns['paga'].copy()
 paga['group_values']=list(adata_beta.obs[adata_beta.uns['paga']['groups']].cat.categories)
 pickle.dump(paga,open(path_fig_data+'latent_beta_paga.pkl','wb'))
 
+# %%
+# Convert to excel
+paga=pickle.load(open(path_fig_data+'latent_beta_paga.pkl','rb'))
+writer = pd.ExcelWriter(path_fig_data+'latent_beta_paga.xlsx',engine='xlsxwriter') 
+pd.DataFrame(paga['pos'],index=paga['group_values'],columns=['x','y']
+            ).to_excel(writer, sheet_name='pos') 
+pd.DataFrame(paga['connectivities'].todense(),
+             index=paga['group_values'], columns=paga['group_values']
+            ).to_excel(writer, sheet_name='connectivities') 
+writer.save()
+
 # %% [markdown]
 # ### Differential gene-set scores
 # Find Reactome gene sets with differential scores in control and STZ treated beta cells from STZ study.
