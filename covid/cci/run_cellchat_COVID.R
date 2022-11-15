@@ -15,7 +15,7 @@ options(stringsAsFactors = FALSE)
 
 ad <- import("anndata", convert = FALSE)
 pd <- import("pandas", convert = FALSE)
-ad_object <- ad$read_h5ad("/Volumes/TIGERII/nobackup/P1D5_anotated.h5ad")
+ad_object <- ad$read_h5ad("../data/P2D7_anotated.h5ad")
 
 ### Access expression matrix
 
@@ -28,10 +28,6 @@ colnames(data.input) <- rownames(py_to_r(ad_object$obs))
 
 meta.data <- py_to_r(ad_object$obs)
 meta <- meta.data
-
-### Normalise data 
-
-data.input <- normalizeData(data.input, scale.factor = 10000, do.log = TRUE)
 
 ### Create `cellchat` object
 
@@ -63,7 +59,7 @@ cellchat <- filterCommunication(cellchat, min.cells = 5)
 
 df.net <- subsetCommunication(cellchat)
 head(df.net)
-#write.table(df.net, sep = ',', row.names = FALSE, 'IFNB_cellchat_net.csv')
+write.table(df.net, sep = ',', row.names = FALSE, './inferences/P2D7_cellchat_net.csv')
 
 ### Infer cell-cell communication
 
